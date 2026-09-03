@@ -77,12 +77,14 @@ async function collectReportData(){
     orderBy: 'v DESC', limit: SOUM_LIMIT
   });
 
-  const [sums, loanCount, totalCount, aimagAmt, aimagCnt, soumAmt, soumCnt, purpose, bank,
+  const [sums, loanCount, totalCount, coopCount, borrowerCount, aimagAmt, aimagCnt, soumAmt, soumCnt, purpose, bank,
          issuedYear, dueYear, status, report, livestock] = await Promise.all([
     queryStats(SVC.loans, { where, stats: sumKpis.map((k, i) =>
       ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
     queryCount(SVC.loans, andWhere(where, cntKpi.extraWhere)),
     queryCount(SVC.loans, where),
+    queryDistinctCount(SVC.loans, F.coop, where),
+    queryDistinctCount(SVC.loans, F.borrower, where),
     byField(F.aimag),
     queryStats(SVC.loans, { where, groupBy: F.aimag,
       stats: [{ onStatisticField: 'OBJECTID', statisticType: 'count', outStatisticFieldName: 'v' }],
@@ -96,7 +98,7 @@ async function collectReportData(){
     queryStats(SVC.loans, { where: andWhere(where, `${F.status} IS NOT NULL`), groupBy: F.status,
       stats: [{ onStatisticField: 'OBJECTID', statisticType: 'count', outStatisticFieldName: 'v' }],
       orderBy: 'v DESC', limit: 100 }),
-    queryStats(SVC.report, { stats: KPIS2.map((k, i) =>
+    queryStats(SVC.report, { stats: REPORT_KPIS.map((k, i) =>
       ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
     queryStats(SVC.livestock, { groupBy: 'aimag_name_boundary',
       stats: [{ onStatisticField: 'last_y', statisticType: 'sum', outStatisticFieldName: 'v' }],
@@ -110,7 +112,7 @@ async function collectReportData(){
   const s0 = sums[0] || {};
 
   return {
-    where, loanCount, totalCount,
+    where, loanCount, totalCount, coopCount, borrowerCount,
     kpi: sumKpis.map((k, i) => [k.label, s0['s' + i] || 0]),
     aimagAmt:  clean(aimagAmt, F.aimag),
     aimagCnt:  clean(aimagCnt, F.aimag),
@@ -121,7 +123,7 @@ async function collectReportData(){
     issuedYear: issuedYear.map(r => [r.key, r.value]),
     dueYear:    dueYear.map(r => [r.key, r.value]),
     status:    clean(status,   F.status),
-    report:    KPIS2.map((k, i) => [k.label, (report[0] || {})['s' + i] || 0]),
+    report:    REPORT_KPIS.map((k, i) => [k.label, (report[0] || {})['s' + i] || 0]),
     livestock: clean(livestock, 'aimag_name_boundary')
   };
 }
@@ -182,6 +184,7 @@ function buildDocument(D, d){
     `${fmtNum(d.loanCount)} зээл олгогдож, олгосон нийт зээл ${fmtMoneyStr(issued)} болов.`,
     docTable(D, ['Үзүүлэлт', 'Утга'],
       [['Өргөдлийн тоо', fmtNum(d.totalCount)], ['Зээлийн тоо', fmtNum(d.loanCount)],
+       ['Хоршооны тоо', fmtNum(d.coopCount)], ['Зээлдэгчийн тоо', fmtNum(d.borrowerCount)],
        ...d.kpi.map(([l, v]) => [l, money(v)])],
       [60, 40], [1])));
 

@@ -289,6 +289,13 @@ function refresh() {
   });
   queryCount(SVC.loans, where).then(n => { $('#mapCount').textContent = fmtNum(n); });
 
+  /* --- Хоршоо / зээлдэгчийн давхардаагүй тоо --- */
+  KPIS2.forEach((k, i) => {
+    if (k.kind !== 'distinct') return;
+    queryDistinctCount(SVC.loans, k.field, where)
+      .then(n => { $('#kpi2_' + i).textContent = fmtNum(n); });
+  });
+
   /* --- Аймгаар: олгосон дүн / зээлийн тоо --- */
   queryStats(SVC.loans, {
     where: wNoAimag, groupBy: F.aimag,
@@ -370,10 +377,10 @@ function setKpiExact(sel, value) { $(sel).textContent = fmtExact(value); }
 function loadStaticWidgets() {
   // Зээлийн тайлангийн 6 үзүүлэлт
   queryStats(SVC.report, {
-    stats: KPIS2.map((k, i) => ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i }))
+    stats: REPORT_KPIS.map((k, i) => ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i }))
   }).then(rows => {
     const a = rows[0] || {};
-    KPIS2.forEach((k, i) => setKpiExact('#kpi2_' + i, a['s' + i] || 0));
+    REPORT_KPIS.forEach((k, i) => setKpiExact('#kpi2_' + KPIS2.indexOf(k), a['s' + i] || 0));
   });
 
   // Малын тоо аймгаар — тоо нь шүүлтүүрээс хамаарахгүй ч сонгосон аймаг

@@ -43,14 +43,21 @@ const KPIS = [
 ];
 
 /* Зээлийн тайлангийн 6 үзүүлэлт (шүүлтүүрт хамаарахгүй) */
+/* 4 багана x 2 мөр. kind:'distinct' нь Khorshoo сервисээс ялгаатай утгын тоо
+   бөгөөд шүүлтүүрт захирагдана; бусад нь Зээлийн тайлангийн улсын үзүүлэлт. */
 const KPIS2 = [
+  { label:'НИЙТ ГҮЙЦЭТГЭЛ',        field:'niit_guitsetgel' },
+  { label:'ГҮЙЦЭТГЭЛ 2026',        field:'guitsetgel_2026' },
   { label:'БАТЛАГДСАН ТӨСӨВ 2026', field:'batlagdsan_tuluw' },
   { label:'2025 ОНЫ ӨР ТӨЛБӨРТ',   field:'ur_tulbur_2025' },
-  { label:'ГҮЙЦЭТГЭЛ 2026',        field:'guitsetgel_2026' },
+  { label:'ХОРШООНЫ ТОО',          field:F.coop,     kind:'distinct' },
+  { label:'ЗЭЭЛДЭГЧИЙН ТОО',       field:F.borrower, kind:'distinct' },
   { label:'01 САР',                field:'sar_1' },
-  { label:'02 САР',                field:'sar_2' },
-  { label:'НИЙТ ГҮЙЦЭТГЭЛ',        field:'niit_guitsetgel' }
+  { label:'02 САР',                field:'sar_2' }
 ];
+
+/* Зээлийн тайлангийн сервисээс нийлбэрээр авах үзүүлэлтүүд */
+const REPORT_KPIS = KPIS2.filter(k => k.kind !== 'distinct');
 
 /* Толгойн шүүлтүүрүүд */
 const SELECTORS = [

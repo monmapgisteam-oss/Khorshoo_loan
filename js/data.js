@@ -49,6 +49,15 @@ async function queryCount(url, where='1=1'){
   return j.count || 0;
 }
 
+/** Талбарын ялгаатай утгын тоо (жишээ нь давхардаагүй хоршооны тоо) */
+async function queryDistinctCount(url, field, where = '1=1'){
+  const j = await esriQuery(url, {
+    where, outFields: field,
+    returnDistinctValues: 'true', returnCountOnly: 'true'
+  });
+  return j.count || 0;
+}
+
 /* ---------- Шүүлтүүрийн төлөв ---------- */
 
 const filters = {
