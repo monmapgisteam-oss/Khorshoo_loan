@@ -70,7 +70,14 @@ async function collectReportData(){
     orderBy: 'v DESC', limit: 1000
   });
 
-  const [sums, loanCount, totalCount, aimagAmt, aimagCnt, purpose, bank,
+  // Сумын нэр аймаг хооронд давхардна тул аймаг-сумын хосоор бүлэглэнэ
+  const bySoum = (field, type) => queryStats(SVC.loans, {
+    where, groupBy: `${F.soum},${F.aimag}`,
+    stats: [{ onStatisticField: field, statisticType: type, outStatisticFieldName: 'v' }],
+    orderBy: 'v DESC', limit: SOUM_LIMIT
+  });
+
+  const [sums, loanCount, totalCount, aimagAmt, aimagCnt, soumAmt, soumCnt, purpose, bank,
          issuedYear, dueYear, status, report, livestock] = await Promise.all([
     queryStats(SVC.loans, { where, stats: sumKpis.map((k, i) =>
       ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
@@ -80,6 +87,8 @@ async function collectReportData(){
     queryStats(SVC.loans, { where, groupBy: F.aimag,
       stats: [{ onStatisticField: 'OBJECTID', statisticType: 'count', outStatisticFieldName: 'v' }],
       orderBy: 'v DESC', limit: 1000 }),
+    bySoum(F.issuedAmt, 'sum'),
+    bySoum('OBJECTID', 'count'),
     byField(F.purpose, `${F.purpose} <> '-'`),
     byField(F.bank),
     statsByYear(SVC.loans, F.issuedDate, F.issuedAmt, where),
@@ -95,6 +104,8 @@ async function collectReportData(){
   ]);
 
   const clean = (rows, field) => rows.filter(r => r[field]).map(r => [r[field], r.v || 0]);
+  const soumRows = rows => rows.filter(r => r[F.soum])
+    .map(r => [r[F.soum], r[F.aimag], r.v || 0]);
   const s0 = sums[0] || {};
 
   return {
@@ -102,6 +113,8 @@ async function collectReportData(){
     kpi: sumKpis.map((k, i) => [k.label, s0['s' + i] || 0]),
     aimagAmt:  clean(aimagAmt, F.aimag),
     aimagCnt:  clean(aimagCnt, F.aimag),
+    soumAmt:   soumRows(soumAmt),
+    soumCnt:   soumRows(soumCnt),
     purpose:   clean(purpose,  F.purpose),
     bank:      clean(bank,     F.bank),
     issuedYear: issuedYear.map(r => [r.key, r.value]),
@@ -179,7 +192,22 @@ function buildDocument(D, d){
     'Доорх хүснэгтэд аймаг тус бүрд олгосон зээлийн тоог буурах эрэмбээр харуулав.',
     docTable(D, ['Аймаг', 'Тоо'], d.aimagCnt.map(([k, v]) => [k, fmtNum(v)]), [60, 40], [1])));
 
-  kids.push(...docSection(D, '4. Зээл олгосон дүн, зориулалтаар',
+  const soumNote = rows => rows.length >= SOUM_LIMIT
+    ? ` Хамгийн өндөр ${SOUM_LIMIT} сумыг оруулав.` : '';
+
+  kids.push(...docSection(D, '4. Олгосон зээлийн дүн, сумаар',
+    'Доорх хүснэгтэд сум тус бүрд олгосон зээлийн нийт дүнг буурах эрэмбээр харуулав.' +
+    soumNote(d.soumAmt),
+    docTable(D, ['Сум', 'Аймаг', 'Дүн'],
+      d.soumAmt.map(([s1, a, v]) => [s1, a, money(v)]), [34, 30, 36], [2])));
+
+  kids.push(...docSection(D, '5. Зээлийн тоо, сумаар',
+    'Доорх хүснэгтэд сум тус бүрд олгосон зээлийн тоог буурах эрэмбээр харуулав.' +
+    soumNote(d.soumCnt),
+    docTable(D, ['Сум', 'Аймаг', 'Тоо'],
+      d.soumCnt.map(([s1, a, v]) => [s1, a, fmtNum(v)]), [34, 30, 36], [2])));
+
+  kids.push(...docSection(D, '6. Зээл олгосон дүн, зориулалтаар',
     'Доорх хүснэгтэд зээлийн зориулалт тус бүрд олгосон нийт дүнг буурах эрэмбээр харуулав.',
     docTable(D, ['ҮАЧ', 'Зориулалт', 'Дүн'],
       // Код олдоогүй зориулалтад нэрийг нь давхардуулж бичихгүй
@@ -188,27 +216,27 @@ function buildDocument(D, d){
         return [code === k ? '—' : code, k, money(v)];
       }), [10, 62, 28], [2])));
 
-  kids.push(...docSection(D, '5. Зээл олгосон банк',
+  kids.push(...docSection(D, '7. Зээл олгосон банк',
     'Доорх хүснэгтэд банк тус бүрийн олгосон зээлийн нийт дүнг харуулав.',
     docTable(D, ['Банк', 'Дүн'], d.bank.map(([k, v]) => [k, money(v)]), [60, 40], [1])));
 
-  kids.push(...docSection(D, '6. Зээл олгосон огноо',
+  kids.push(...docSection(D, '8. Зээл олгосон огноо',
     'Доорх хүснэгтэд зээл олгосон он тус бүрийн нийт дүнг харуулав.',
     docTable(D, ['Он', 'Дүн'], d.issuedYear.map(([k, v]) => [k, money(v)]), [60, 40], [1])));
 
-  kids.push(...docSection(D, '7. Төлөлтийн огноо',
+  kids.push(...docSection(D, '9. Төлөлтийн огноо',
     'Доорх хүснэгтэд зээл төлөгдөх он тус бүрд ногдох дүнг харуулав.',
     docTable(D, ['Он', 'Дүн'], d.dueYear.map(([k, v]) => [k, money(v)]), [60, 40], [1])));
 
-  kids.push(...docSection(D, '8. Явц (Өргөдлийг шийдвэрлэсэн эсэх)',
+  kids.push(...docSection(D, '10. Явц (Өргөдлийг шийдвэрлэсэн эсэх)',
     'Доорх хүснэгтэд өргөдлийн явцын байдлыг тоогоор харуулав.',
     docTable(D, ['Хариулт', 'Тоо'], d.status.map(([k, v]) => [k, fmtNum(v)]), [60, 40], [1])));
 
-  kids.push(...docSection(D, '9. Зээлийн тайлан (төсөв, гүйцэтгэл)',
+  kids.push(...docSection(D, '11. Зээлийн тайлан (төсөв, гүйцэтгэл)',
     'Улсын хэмжээний үзүүлэлт — дээрх шүүлтүүрээс хамаарахгүй.',
     docTable(D, ['Үзүүлэлт', 'Утга'], d.report.map(([l, v]) => [l, fmtExact(v) + '₮']), [60, 40], [1])));
 
-  kids.push(...docSection(D, '10. Малын тоо, аймгаар',
+  kids.push(...docSection(D, '12. Малын тоо, аймгаар',
     'Улсын хэмжээний үзүүлэлт — дээрх шүүлтүүрээс хамаарахгүй.',
     docTable(D, ['Аймаг', 'Мянган толгой'],
       d.livestock.map(([k, v]) => [k, grouped(v)]), [60, 40], [1])));

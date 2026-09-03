@@ -131,8 +131,21 @@
 
   <!-- БАРУУН БАГАНА -->
   <section class="col col-right panel">
-    <div class="panel-title">ЗЭЭЛИЙН ЗОРИУЛАЛТ ОЛГОСОН ДҮНГЭЭР</div>
-    <div class="chart-wrap"><canvas id="chartPurpose"></canvas></div>
+    <div class="panel-title" data-title-for="right"></div>
+    <div class="tab-body">
+      <div class="tab-pane active" data-pane="r1"><canvas id="chartPurpose"></canvas></div>
+      <div class="tab-pane" data-pane="r2"><canvas id="chartSoumAmount"></canvas></div>
+      <div class="tab-pane" data-pane="r3"><canvas id="chartSoumCount"></canvas></div>
+    </div>
+    <div class="tabs" data-tabs="right">
+      <button class="tab-nav prev">&#8249;</button>
+      <div class="tab-strip">
+        <button class="tab active" data-tab="r1">ЗЭЭЛИЙН ЗОРИУЛАЛТ</button>
+        <button class="tab" data-tab="r2">ОЛГОСОН ДҮН СУМААР</button>
+        <button class="tab" data-tab="r3">ОЛГОСОН ТОО СУМААР</button>
+      </div>
+      <button class="tab-nav next">&#8250;</button>
+    </div>
   </section>
 
 </main>

@@ -205,9 +205,72 @@ async function statsByYear(url, dateField, valueField, where) {
     .sort((a, b) => a.key - b.key);
 }
 
+/* ===== Графикаас шүүх ===== */
+/* Багана дээр дарахад холбогдох толгойн шүүлтүүр асаж/унтарна. Тухайн график
+   өөрийнхөө талбарыг шүүлтээс хассан тул дарсны дараа ч бүх ангилал хэвээр
+   харагдаж, өөр ангилал руу шууд дарах боломжтой (сонгосон нь тодорно). */
+
+function toggleFilter(field, value){
+  const set = filters[field];
+  if (set.has(value)) set.delete(value); else set.add(value);
+  invalidateSelectorCaches('');
+  updateSelectorBadges();
+  refresh();
+}
+
+/** Сумын нэр аймаг хооронд давхардах тул сум сонгоход аймгийг нь мөн онооно */
+function toggleSoum(soum, aimag){
+  const set = filters[F.soum];
+  if (set.has(soum)) set.delete(soum);
+  else { set.add(soum); filters[F.aimag].add(aimag); }
+  invalidateSelectorCaches('');
+  updateSelectorBadges();
+  refresh();
+}
+
+const picked = field => k => filters[field].has(k);
+
+/**
+ * Сумаар бүлэглэсэн баганан график.
+ * Сумын нэр аймаг хооронд давхардана (жишээ нь "Булган" 6 аймагт) тул
+ * аймаг-сумын хосоор бүлэглэж, зөвхөн давхардсан нэрэнд аймгийг нь хавсаргана.
+ */
+function soumChart(id, where, statField, statType, opts){
+  return queryStats(SVC.loans, {
+    where,
+    groupBy: `${F.soum},${F.aimag}`,
+    stats: [{ onStatisticField: statField, statisticType: statType, outStatisticFieldName: 'v' }],
+    orderBy: 'v DESC', limit: SOUM_LIMIT
+  }).then(rows => {
+    const valid = rows.filter(r => r[F.soum]);
+    const seen = {};
+    valid.forEach(r => { seen[r[F.soum]] = (seen[r[F.soum]] || 0) + 1; });
+
+    const short = new Map();
+    const parts = new Map();
+    const data = valid.map(r => {
+      const key = `${r[F.soum]}, ${r[F.aimag]}`;
+      short.set(key, seen[r[F.soum]] > 1 ? `${r[F.soum]} (${r[F.aimag]})` : r[F.soum]);
+      parts.set(key, { soum: r[F.soum], aimag: r[F.aimag] });
+      return { key, value: r.v || 0 };
+    });
+    hBarChart(id, data, Object.assign({
+      axisLabel: k => short.get(k) || k,
+      selected:  k => filters[F.soum].has((parts.get(k) || {}).soum),
+      onSelect:  k => { const p = parts.get(k); if (p) toggleSoum(p.soum, p.aimag); }
+    }, opts));
+  });
+}
+
 /* ===== 5. Шүүлтүүрт хамаарах виджетүүд ===== */
 function refresh() {
   const where = buildWhere();
+  // График өөрийн талбараа шүүхгүй — эс тэгвээс дарсны дараа ганц багана үлдэж,
+  // өөр ангилал руу дарах боломжгүй болно
+  const wNoAimag   = buildWhere([F.aimag]);
+  const wNoSoum    = buildWhere([F.soum]);
+  const wNoBank    = buildWhere([F.bank]);
+  const wNoPurpose = buildWhere([F.purpose]);
   setMapWhere(where);
 
   /* --- KPI мөр 1: нийлбэрүүд нэг асуулгаар --- */
@@ -228,38 +291,50 @@ function refresh() {
 
   /* --- Аймгаар: олгосон дүн / зээлийн тоо --- */
   queryStats(SVC.loans, {
-    where, groupBy: F.aimag,
+    where: wNoAimag, groupBy: F.aimag,
     stats: [{ onStatisticField: F.issuedAmt, statisticType: 'sum', outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartAimagAmount',
     rows.filter(r => r[F.aimag]).map(r => ({ key: r[F.aimag], value: r.v || 0 })),
-    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн' }));
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн',
+      selected: picked(F.aimag), onSelect: k => toggleFilter(F.aimag, k) }));
 
   queryStats(SVC.loans, {
-    where, groupBy: F.aimag,
+    where: wNoAimag, groupBy: F.aimag,
     stats: [{ onStatisticField: 'OBJECTID', statisticType: 'count', outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartAimagCount',
     rows.filter(r => r[F.aimag]).map(r => ({ key: r[F.aimag], value: r.v || 0 })),
-    { valueFmt: fmtNum, labelFmt: fmtNum, color: BAR_COLOR, measure: 'Зээлийн тоо' }));
+    { valueFmt: fmtNum, labelFmt: fmtNum, color: BAR_COLOR, measure: 'Зээлийн тоо',
+      selected: picked(F.aimag), onSelect: k => toggleFilter(F.aimag, k) }));
 
   /* --- Банкаар --- */
   queryStats(SVC.loans, {
-    where, groupBy: F.bank,
+    where: wNoBank, groupBy: F.bank,
     stats: [{ onStatisticField: F.issuedAmt, statisticType: 'sum', outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartBank',
     rows.filter(r => r[F.bank]).map(r => ({ key: r[F.bank], value: r.v || 0 })),
-    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн' }));
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн',
+      selected: picked(F.bank), onSelect: k => toggleFilter(F.bank, k) }));
 
   /* --- Зээлийн зориулалтаар --- */
   queryStats(SVC.loans, {
-    where: andWhere(where, `${F.purpose} <> '-'`), groupBy: F.purpose,
+    where: andWhere(wNoPurpose, `${F.purpose} <> '-'`), groupBy: F.purpose,
     stats: [{ onStatisticField: F.issuedAmt, statisticType: 'sum', outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartPurpose',
     rows.filter(r => r[F.purpose]).map(r => ({ key: r[F.purpose], value: r.v || 0 })),
-    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, axisLabel: purposeCode, measure: 'Олгосон зээлийн дүн' }));
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, axisLabel: purposeCode, measure: 'Олгосон зээлийн дүн',
+      selected: picked(F.purpose), onSelect: k => toggleFilter(F.purpose, k) }));
+
+  drawLivestock();
+
+  /* --- Сумаар: олгосон дүн / зээлийн тоо --- */
+  soumChart('chartSoumAmount', wNoSoum, F.issuedAmt, 'sum',
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн' });
+  soumChart('chartSoumCount', wNoSoum, 'OBJECTID', 'count',
+    { valueFmt: fmtNum, labelFmt: fmtNum, color: BAR_COLOR, measure: 'Зээлийн тоо' });
 
   /* --- Огноогоор --- */
   statsByYear(SVC.loans, F.issuedDate, F.issuedAmt, where)
@@ -279,6 +354,15 @@ function refresh() {
 
 const fmtHerd = v => grouped(v) + ' мян.толгой';
 
+let livestockRows = null;
+
+function drawLivestock(){
+  if (!livestockRows) return;
+  hBarChart('chartLivestock', livestockRows,
+    { valueFmt: fmtHerd, labelFmt: fmtHerd, color: BAR_COLOR, measure: 'Малын тоо',
+      selected: picked(F.aimag), onSelect: k => toggleFilter(F.aimag, k) });
+}
+
 function setKpi(sel, value)      { $(sel).textContent = fmtMoneyStr(value); }
 function setKpiExact(sel, value) { $(sel).textContent = fmtExact(value); }
 
@@ -292,14 +376,17 @@ function loadStaticWidgets() {
     KPIS2.forEach((k, i) => setKpiExact('#kpi2_' + i, a['s' + i] || 0));
   });
 
-  // Малын тоо аймгаар
+  // Малын тоо аймгаар — тоо нь шүүлтүүрээс хамаарахгүй ч сонгосон аймаг
+  // тодрох ёстой тул нэг удаа татаад кэшлэнэ
   queryStats(SVC.livestock, {
     groupBy: 'aimag_name_boundary',
     stats: [{ onStatisticField: 'last_y', statisticType: 'sum', outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: 1000
-  }).then(rows => hBarChart('chartLivestock',
-    rows.filter(r => r.aimag_name_boundary).map(r => ({ key: r.aimag_name_boundary, value: r.v || 0 })),
-    { valueFmt: fmtHerd, labelFmt: fmtHerd, color: BAR_COLOR, measure: 'Малын тоо' }));
+  }).then(rows => {
+    livestockRows = rows.filter(r => r.aimag_name_boundary)
+      .map(r => ({ key: r.aimag_name_boundary, value: r.v || 0 }));
+    drawLivestock();
+  });
 
   // 2024 / 2025 онд олгосон зээлийн төлөлт
   const repay = (type, id, color) => queryStats(SVC.progress, {

@@ -204,10 +204,12 @@ Chart.register(dataLabels, donutLabels, barPadding);
 /**
  * @param {object} o
  * @param {function} [o.axisLabel] - тэнхлэгт харагдах богино нэр (hover дээр бүтнээрээ)
+ * @param {function} [o.selected]  - key => сонгогдсон эсэх (тодруулж харуулна)
+ * @param {function} [o.onSelect]  - багана дээр дарахад key-гээр дуудагдана
  * @param {number} [o.wrapLabels] - ангиллын нэрийг энэ өргөнд багтаан мөр болгож таслах
  */
 function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0],
-                               measure, axisLabel, wrapLabels } = {}){
+                               measure, axisLabel, wrapLabels, selected, onSelect } = {}){
   const ctx = document.getElementById(id);
   if (!ctx) return;
   const fmtLbl = labelFmt || valueFmt;
@@ -222,11 +224,18 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
   // barPadding плагин зурах бүрд хийнэ (далд таб дээр өргөн нь 0 байдаг).
   const padRight = Math.min(130, Math.max(...values.map(v => textWidth(fmtLbl(v))), 0) + 12);
 
+  const isOn   = k => !!(selected && selected(k));
+  const fills  = full.map(k => alpha(color, isOn(k) ? .55 : FILL_ALPHA));
+  const strokes = full.map(k => isOn(k) ? '#ffffff' : color);
+
   if (charts[id]){
     const c = charts[id];
     c.$full = full;
+    c.$onSelect = onSelect;
     c.data.labels = labels;
     c.data.datasets[0].data = values;
+    c.data.datasets[0].backgroundColor = fills;
+    c.data.datasets[0].borderColor = strokes;
     c.$padRight = padRight;
     c.update();
     c.resize();
@@ -236,14 +245,21 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
     type:'bar',
     data:{ labels, datasets:[{
       data: values,
-      backgroundColor: alpha(color, FILL_ALPHA),
-      borderColor: color, borderWidth:1, borderSkipped:false,
+      backgroundColor: fills,
+      borderColor: strokes, borderWidth:1, borderSkipped:false,
       hoverBackgroundColor: alpha(color, .38),
       borderRadius:2, barPercentage:.82, categoryPercentage:.9
     }] },
     options:{
       indexAxis:'y',
       layout:{ padding:{ right:padRight } },
+      onClick(evt, els, chart){
+        if (!chart.$onSelect || !els.length) return;
+        chart.$onSelect(chart.$full[els[0].index]);
+      },
+      onHover(evt, els, chart){
+        if (chart.$onSelect) chart.canvas.style.cursor = els.length ? 'pointer' : 'default';
+      },
       plugins:{
         legend:{ display:false },
         tooltip: tooltipCfg(valueFmt, 'x', measure),
@@ -258,6 +274,7 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
     }
   });
   charts[id].$full = full;
+  charts[id].$onSelect = onSelect;
   charts[id].$padRight = padRight;
 }
 
