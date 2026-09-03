@@ -144,6 +144,7 @@ async function collectReportData(){
     stats: [
       { onStatisticField: F.issuedAmt,     statisticType: 'sum', outStatisticFieldName: 'amt'  },
       { onStatisticField: F.guaranteedAmt, statisticType: 'sum', outStatisticFieldName: 'gua'  },
+      { onStatisticField: F.balance,       statisticType: 'sum', outStatisticFieldName: 'bal'  },
       { onStatisticField: F.issuedDate,    statisticType: 'min', outStatisticFieldName: 'dmin' },
       { onStatisticField: F.issuedDate,    statisticType: 'max', outStatisticFieldName: 'dmax' }
     ],
@@ -164,7 +165,7 @@ async function collectReportData(){
   const rowsMain = groups.map((g, i) => {
     const r = breakdown.find(x => x[groupField] === g);
     return { name: g, coops: counts[i].coops, members: counts[i].members,
-             dmin: r.dmin, dmax: r.dmax, gua: r.gua || 0, amt: r.amt || 0 };
+             dmin: r.dmin, dmax: r.dmax, gua: r.gua || 0, amt: r.amt || 0, bal: r.bal || 0 };
   });
 
   const clean = (rows, field) => rows.filter(r => r[field]).map(r => [r[field], r.v || 0]);
@@ -280,13 +281,13 @@ function buildDocument(D, d){
     `зээлийн үлдэгдэл ${fmtMoneyStr(kpiVal('ЗЭЭЛИЙН ҮЛДЭГДЭЛ'))} байна.`,
     docTableWithTotal(D,
       [d.groupHeader, 'Зээл авсан хоршооны тоо', 'Зээл авсан гишүүний тоо',
-       'Зээл авсан огноо', 'Зээлийн батлан даасан дүн', 'Зээлийн дүн'],
-      rm.map(r => [r.name, fmtNum(r.coops), fmtNum(r.members),
-                   fmtDateRange(r.dmin, r.dmax), grouped(r.gua, 0), grouped(r.amt, 0)]),
+       'Зээл авсан огноо', 'Зээлийн батлан даасан дүн', 'Зээлийн дүн', 'Зээлийн үлдэгдэл'],
+      rm.map(r => [r.name, fmtNum(r.coops), fmtNum(r.members), fmtDateRange(r.dmin, r.dmax),
+                   grouped(r.gua, 0), grouped(r.amt, 0), grouped(r.bal, 0)]),
       // Хоршоо/гишүүний нийт нь баганын нийлбэр биш, бүхэлдээ давхардаагүй тоо
-      ['Нийт', fmtNum(d.coopCount), fmtNum(d.borrowerCount),
-       fmtDateRange(allMin, allMax), grouped(sumOf('gua'), 0), grouped(sumOf('amt'), 0)],
-      [18, 14, 14, 20, 17, 17], [1, 2, 4, 5])));
+      ['Нийт', fmtNum(d.coopCount), fmtNum(d.borrowerCount), fmtDateRange(allMin, allMax),
+       grouped(sumOf('gua'), 0), grouped(sumOf('amt'), 0), grouped(sumOf('bal'), 0)],
+      [16, 12, 12, 17, 15, 14, 14], [1, 2, 4, 5, 6])));
 
   kids.push(...docSection(D, '2. Олгосон зээлийн дүн, аймгаар',
     'Доорх хүснэгтэд аймаг тус бүрд олгосон зээлийн нийт дүнг буурах эрэмбээр харуулав.',
