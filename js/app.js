@@ -233,7 +233,7 @@ function refresh() {
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartAimagAmount',
     rows.filter(r => r[F.aimag]).map(r => ({ key: r[F.aimag], value: r.v || 0 })),
-    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: PALETTE[0] }));
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн' }));
 
   queryStats(SVC.loans, {
     where, groupBy: F.aimag,
@@ -241,7 +241,7 @@ function refresh() {
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartAimagCount',
     rows.filter(r => r[F.aimag]).map(r => ({ key: r[F.aimag], value: r.v || 0 })),
-    { valueFmt: v => fmtNum(v) + ' зээл', labelFmt: fmtNum, color: PALETTE[1] }));
+    { valueFmt: fmtNum, labelFmt: fmtNum, color: BAR_COLOR, measure: 'Зээлийн тоо' }));
 
   /* --- Банкаар --- */
   queryStats(SVC.loans, {
@@ -250,7 +250,7 @@ function refresh() {
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartBank',
     rows.filter(r => r[F.bank]).map(r => ({ key: r[F.bank], value: r.v || 0 })),
-    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: PALETTE[2] }));
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн' }));
 
   /* --- Зээлийн зориулалтаар --- */
   queryStats(SVC.loans, {
@@ -259,14 +259,14 @@ function refresh() {
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartPurpose',
     rows.filter(r => r[F.purpose]).map(r => ({ key: r[F.purpose], value: r.v || 0 })),
-    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: PALETTE[4], axisLabel: purposeCode }));
+    { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, axisLabel: purposeCode, measure: 'Олгосон зээлийн дүн' }));
 
   /* --- Огноогоор --- */
   statsByYear(SVC.loans, F.issuedDate, F.issuedAmt, where)
     .then(rows => hBarChart('chartIssuedYear', rows,
-      { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: PALETTE[3] }));
+      { valueFmt: fmtMoneyStr, labelFmt: fmtMoneyStr, color: BAR_COLOR, measure: 'Олгосон зээлийн дүн' }));
   statsByYear(SVC.loans, F.dueDate, F.issuedAmt, where)
-    .then(rows => areaChart('chartDueYear', rows, { color: AREA_COLOR }));
+    .then(rows => areaChart('chartDueYear', rows, { color: AREA_COLOR, measure: 'Төлөгдөх дүн' }));
 
   /* --- Өргөдлийн явц --- */
   queryStats(SVC.loans, {
@@ -274,7 +274,7 @@ function refresh() {
     stats: [{ onStatisticField: 'OBJECTID', statisticType: 'count', outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: 100
   }).then(rows => donutChart('chartStatus',
-    rows.map(r => ({ key: r[F.status], value: r.v || 0 })), { valueFmt: fmtNum }));
+    rows.map(r => ({ key: r[F.status], value: r.v || 0 })), { valueFmt: fmtNum, measure: 'Өргөдлийн тоо' }));
 }
 
 const fmtHerd = v => grouped(v) + ' мян.толгой';
@@ -299,7 +299,7 @@ function loadStaticWidgets() {
     orderBy: 'v DESC', limit: 1000
   }).then(rows => hBarChart('chartLivestock',
     rows.filter(r => r.aimag_name_boundary).map(r => ({ key: r.aimag_name_boundary, value: r.v || 0 })),
-    { valueFmt: fmtHerd, labelFmt: fmtHerd, color: PALETTE[5] }));
+    { valueFmt: fmtHerd, labelFmt: fmtHerd, color: BAR_COLOR, measure: 'Малын тоо' }));
 
   // 2024 / 2025 онд олгосон зээлийн төлөлт
   const repay = (type, id, color) => queryStats(SVC.progress, {
@@ -308,7 +308,8 @@ function loadStaticWidgets() {
     stats: [{ onStatisticField: 'Зээлийн_дүн', statisticType: 'sum', outStatisticFieldName: 'v' }],
     orderBy: 'Он ASC', limit: 200
   }).then(rows => areaChart(id,
-    rows.filter(r => r['Он'] != null).map(r => ({ key: r['Он'], value: r.v || 0 })), { color }));
+    rows.filter(r => r['Он'] != null).map(r => ({ key: r['Он'], value: r.v || 0 })),
+    { color, measure: 'Зээлийн дүн' }));
 
   repay('2024 онд олгосон зээл', 'chartRepay2024', AREA_COLOR);
   repay('2025 онд олгосон зээл', 'chartRepay2025', AREA_COLOR);

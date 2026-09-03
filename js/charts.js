@@ -12,8 +12,9 @@ Chart.defaults.animation.duration = 350;
 
 const charts = {};
 
-const LABEL_FONT = '600 10px "Segoe UI",Roboto,Arial,sans-serif';
-const LABEL_FONT_REG = '10px "Segoe UI",Roboto,Arial,sans-serif';
+/* Бүх графикийн утгын шошго: цагаан, тод биш */
+const LABEL_FONT  = '10px "Segoe UI",Roboto,Arial,sans-serif';
+const LABEL_COLOR = '#ffffff';
 
 /** '#22d3ee' -> 'rgba(34,211,238,a)' */
 function alpha(hex, a){
@@ -42,22 +43,35 @@ function wrapForTooltip(text, maxChars = 42){
   return lines;
 }
 
-/** @param {'x'|'y'} valueAxis - утга уншигдах тэнхлэг */
-function tooltipCfg(valueFmt, valueAxis){
+/** Идэвхтэй мөрийн өнгийг тултипын цэгэнд ашиглах */
+function tooltipDotColor(it){
+  const bc = it.dataset.borderColor;
+  const c = Array.isArray(bc) ? bc[it.dataIndex] : bc;
+  return { borderColor: c, backgroundColor: c, borderWidth: 0 };
+}
+
+/**
+ * @param {'x'|'y'} valueAxis - утга уншигдах тэнхлэг
+ * @param {string} [measure]  - утгын өмнө бичих хэмжигдэхүүний нэр
+ */
+function tooltipCfg(valueFmt, valueAxis, measure){
   return {
     backgroundColor:'#060c10',
     borderColor: PALETTE[0], borderWidth:1, cornerRadius:6,
     padding:{ top:9, bottom:9, left:11, right:11 },
     titleColor:'#e6f0f4', titleFont:{ size:11.5, weight:'600' }, titleMarginBottom:6,
     bodyColor: PALETTE[0], bodyFont:{ size:14, weight:'700' },
-    displayColors:false, caretSize:6,
+    displayColors:true, usePointStyle:true, boxWidth:7, boxHeight:7, boxPadding:5,
+    caretSize:6,
     callbacks:{
+      labelColor: tooltipDotColor,
       title: items => {
         const full = items[0].chart.$full;
         const t = (full && full[items[0].dataIndex]) || items[0].label;
-        return wrapForTooltip(Array.isArray(t) ? t.join(' ') : t);
+        const lines = wrapForTooltip(Array.isArray(t) ? t.join(' ') : t);
+        return lines.map((l, i) => (i === 0 ? '• ' : '   ') + l);
       },
-      label: it => valueFmt(it.parsed[valueAxis])
+      label: it => (measure ? measure + ': ' : '') + valueFmt(it.parsed[valueAxis])
     }
   };
 }
@@ -72,7 +86,7 @@ const dataLabels = {
     ctx.save();
     ctx.font = opts.font || LABEL_FONT;
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = opts.color || '#b8ccd6';
+    ctx.fillStyle = opts.color || LABEL_COLOR;
 
     chart.getDatasetMeta(0).data.forEach((el, i) => {
       const raw = ds.data[i];
@@ -143,7 +157,7 @@ const donutLabels = {
       const lines = wrapLines(String(chart.data.labels[i]), Math.max(38, Math.min(maxW, avail)));
       lines.push(pct.toFixed(2) + '%');
 
-      ctx.fillStyle = color;
+      ctx.fillStyle = LABEL_COLOR;
       ctx.textAlign = dir > 0 ? 'left' : 'right';
       let ty = y1 - (lines.length - 1) * LH / 2;
       for (const t of lines){ ctx.fillText(t, x2 + dir * 4, ty); ty += LH; }
@@ -193,7 +207,7 @@ Chart.register(dataLabels, donutLabels, barPadding);
  * @param {number} [o.wrapLabels] - ангиллын нэрийг энэ өргөнд багтаан мөр болгож таслах
  */
 function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0],
-                               axisLabel, wrapLabels } = {}){
+                               measure, axisLabel, wrapLabels } = {}){
   const ctx = document.getElementById(id);
   if (!ctx) return;
   const fmtLbl = labelFmt || valueFmt;
@@ -223,7 +237,7 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
     data:{ labels, datasets:[{
       data: values,
       backgroundColor: alpha(color, FILL_ALPHA),
-      borderColor: color, borderWidth:1.5, borderSkipped:false,
+      borderColor: color, borderWidth:1, borderSkipped:false,
       hoverBackgroundColor: alpha(color, .38),
       borderRadius:2, barPercentage:.82, categoryPercentage:.9
     }] },
@@ -232,7 +246,7 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
       layout:{ padding:{ right:padRight } },
       plugins:{
         legend:{ display:false },
-        tooltip: tooltipCfg(valueFmt, 'x'),
+        tooltip: tooltipCfg(valueFmt, 'x', measure),
         dataLabels:{ axis:'x', formatter:fmtLbl }
       },
       scales:{
@@ -265,7 +279,7 @@ const areaFill = color => c => {
   return g;
 };
 
-function areaChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0] } = {}){
+function areaChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0], measure } = {}){
   const ctx = document.getElementById(id);
   if (!ctx) return;
   const labels = rows.map(r => String(r.key));
@@ -294,8 +308,8 @@ function areaChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
       layout:{ padding:{ top:28, right:8 } },
       plugins:{
         legend:{ display:false },
-        tooltip: tooltipCfg(valueFmt, 'y'),
-        dataLabels:{ axis:'y', formatter: labelFmt || valueFmt, color:'#e6f0f4', font: LABEL_FONT_REG }
+        tooltip: tooltipCfg(valueFmt, 'y', measure),
+        dataLabels:{ axis:'y', formatter: labelFmt || valueFmt }
       },
       scales:{
         y:{ type: useLog ? 'logarithmic' : 'linear',
@@ -308,7 +322,7 @@ function areaChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
 }
 
 /* ---------- Бөгж диаграм ---------- */
-function donutChart(id, rows, { valueFmt = fmtNum } = {}){
+function donutChart(id, rows, { valueFmt = fmtNum, measure } = {}){
   const ctx = document.getElementById(id);
   if (!ctx) return;
   const labels = rows.map(r => r.key == null ? '(хоосон)' : String(r.key));
@@ -328,7 +342,7 @@ function donutChart(id, rows, { valueFmt = fmtNum } = {}){
   charts[id] = new Chart(ctx, {
     type:'doughnut',
     data:{ labels, datasets:[{
-      data:values, backgroundColor:fills, borderColor:colors, borderWidth:1.5,
+      data:values, backgroundColor:fills, borderColor:colors, borderWidth:1,
       hoverBackgroundColor: colors.map(c => alpha(c, .38)), hoverOffset:4
     }] },
     options:{
@@ -338,11 +352,18 @@ function donutChart(id, rows, { valueFmt = fmtNum } = {}){
         legend:{ display:false },
         donutLabels:{ minPercent:2, maxWidth:74 },
         tooltip:{
-          backgroundColor:'#060c10', borderColor:'#24333d', borderWidth:1, padding:8,
+          backgroundColor:'#060c10', borderColor: PALETTE[0], borderWidth:1, cornerRadius:6,
+          padding:{ top:9, bottom:9, left:11, right:11 },
+          titleColor:'#e6f0f4', titleFont:{ size:11.5, weight:'600' }, titleMarginBottom:6,
+          bodyColor:'#e6f0f4', bodyFont:{ size:13, weight:'700' },
+          displayColors:true, usePointStyle:true, boxWidth:7, boxHeight:7, boxPadding:5,
           callbacks:{
+            labelColor: tooltipDotColor,
+            title: items => wrapForTooltip(items[0].label).map((l, i) => (i === 0 ? '• ' : '   ') + l),
             label: it => {
               const sum = it.dataset.data.reduce((a, b) => a + b, 0) || 1;
-              return `${valueFmt(it.parsed)} (${(it.parsed / sum * 100).toFixed(2)}%)`;
+              const pct = (it.parsed / sum * 100).toFixed(2);
+              return `${measure ? measure + ': ' : ''}${valueFmt(it.parsed)} (${pct}%)`;
             }
           }
         }
