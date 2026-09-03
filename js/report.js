@@ -112,7 +112,7 @@ async function collectReportData(){
       ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
     queryCount(SVC.loans, andWhere(where, cntKpi.extraWhere)),
     queryCount(SVC.loans, where),
-    queryDistinctCount(SVC.loans, F.coop, where),
+    queryDistinctCount(SVC.loans, F.coopId, where),
     queryDistinctCount(SVC.loans, F.borrower, where),
     byField(F.aimag),
     queryStats(SVC.loans, { where, groupBy: F.aimag,
@@ -155,7 +155,7 @@ async function collectReportData(){
   const counts = await withLimit(groups, 6, async g => {
     const w = andWhere(where, `${groupField} = ${sqlStr(g)}`);
     const [coops, members] = await Promise.all([
-      queryDistinctCount(SVC.loans, F.coop, w),
+      queryDistinctCount(SVC.loans, F.coopId, w),
       queryDistinctCount(SVC.loans, F.borrower, w)
     ]);
     return { coops, members };

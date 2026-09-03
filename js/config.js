@@ -29,7 +29,10 @@ const F = {
   issuedDate: 'Олгосон_огноо',
   dueDate: 'Төлөгдөх_огноо',
   borrower: 'Зээл_хүсэгчийн_овог_нэр',
-  coop: 'Хоршооны_нэр'
+  coop: 'Хоршооны_нэр',
+  // Хоршоог тоолоход РД-г ашиглана: нэг хоршоо олон бичлэгт өөр өөрөөр
+  // бичигдсэн байдаг тул нэрээр тоолоход 9,081 гарч 1,297-оор илүүддэг
+  coopId: 'Хоршооны_РД'
 };
 
 /* Толгойн 5 үзүүлэлт */
@@ -51,7 +54,7 @@ const KPIS2 = [
   { label:'ГҮЙЦЭТГЭЛ 2026',        field:'guitsetgel_2026' },
   { label:'БАТЛАГДСАН ТӨСӨВ 2026', field:'batlagdsan_tuluw' },
   { label:'2025 ОНЫ ӨР ТӨЛБӨРТ',   field:'ur_tulbur_2025' },
-  { label:'ХОРШООНЫ ТОО',          field:F.coop,     kind:'distinct' },
+  { label:'ХОРШООНЫ ТОО',          field:F.coopId,   kind:'distinct' },
   { label:'ЗЭЭЛДЭГЧИЙН ТОО',       field:F.borrower, kind:'distinct' },
   { label:'01 САР',                field:'sar_1' },
   { label:'02 САР',                field:'sar_2' }
