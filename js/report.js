@@ -30,6 +30,35 @@ function fmtMoneyDoc(v){
   return grouped(v, 0) + '₮';
 }
 
+/** Огноог YYYY.MM.DD болгох (ArcGIS UTC миллисекунд буцаадаг) */
+function fmtDate(ms){
+  if (ms == null) return '';
+  const d = new Date(ms);
+  const p = n => String(n).padStart(2, '0');
+  return `${d.getUTCFullYear()}.${p(d.getUTCMonth() + 1)}.${p(d.getUTCDate())}`;
+}
+
+/** Хугацааны муж: ижил бол нэг огноо */
+function fmtDateRange(min, max){
+  const a = fmtDate(min), b = fmtDate(max);
+  if (!a && !b) return '';
+  return a === b ? a : `${a} - ${b}`;
+}
+
+/** Зэрэг явуулах хүсэлтийн тоог хязгаарлан гүйцэтгэнэ */
+async function withLimit(items, limit, fn){
+  const out = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length){
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return out;
+}
+
 /** Идэвхтэй шүүлтүүрийн тайлбар */
 function filterSummary(){
   const parts = [];
@@ -105,6 +134,39 @@ async function collectReportData(){
       orderBy: 'v DESC', limit: 1000 })
   ]);
 
+  // 1-р бүлгийн задаргаа: нэг аймаг сонгосон бол сумаар, эс бөгөөс аймгаар
+  const aimags = [...filters[F.aimag]];
+  const oneAimag   = aimags.length === 1 ? aimags[0] : null;
+  const groupField = oneAimag ? F.soum : F.aimag;
+
+  const breakdown = await queryStats(SVC.loans, {
+    where, groupBy: groupField,
+    stats: [
+      { onStatisticField: F.issuedAmt,     statisticType: 'sum', outStatisticFieldName: 'amt'  },
+      { onStatisticField: F.guaranteedAmt, statisticType: 'sum', outStatisticFieldName: 'gua'  },
+      { onStatisticField: F.issuedDate,    statisticType: 'min', outStatisticFieldName: 'dmin' },
+      { onStatisticField: F.issuedDate,    statisticType: 'max', outStatisticFieldName: 'dmax' }
+    ],
+    orderBy: groupField + ' ASC', limit: 1000
+  });
+
+  // Давхардаагүй тоог бүлэг тус бүрд нь сервер талд тоолуулна
+  const groups = breakdown.filter(r => r[groupField]).map(r => r[groupField]);
+  const counts = await withLimit(groups, 6, async g => {
+    const w = andWhere(where, `${groupField} = ${sqlStr(g)}`);
+    const [coops, members] = await Promise.all([
+      queryDistinctCount(SVC.loans, F.coop, w),
+      queryDistinctCount(SVC.loans, F.borrower, w)
+    ]);
+    return { coops, members };
+  });
+
+  const rowsMain = groups.map((g, i) => {
+    const r = breakdown.find(x => x[groupField] === g);
+    return { name: g, coops: counts[i].coops, members: counts[i].members,
+             dmin: r.dmin, dmax: r.dmax, gua: r.gua || 0, amt: r.amt || 0 };
+  });
+
   const clean = (rows, field) => rows.filter(r => r[field]).map(r => [r[field], r.v || 0]);
   // Дараалал нь хүснэгтийн баганатай ижил: Аймаг -> Сум -> утга
   const soumRows = rows => rows.filter(r => r[F.soum])
@@ -113,6 +175,8 @@ async function collectReportData(){
 
   return {
     where, loanCount, totalCount, coopCount, borrowerCount,
+    groupHeader: oneAimag ? `${oneAimag} аймаг` : 'Аймаг',
+    rowsMain,
     kpi: sumKpis.map((k, i) => [k.label, s0['s' + i] || 0]),
     aimagAmt:  clean(aimagAmt, F.aimag),
     aimagCnt:  clean(aimagCnt, F.aimag),
@@ -152,6 +216,28 @@ function docTable(D, headers, rows, widths, rightCols){
   });
 }
 
+/** Сүүлийн мөрийг тодруулсан хүснэгт (нийт дүн) */
+function docTableWithTotal(D, headers, rows, totalRow, widths, rightCols){
+  const { Table, TableRow, TableCell, Paragraph, TextRun, WidthType, AlignmentType } = D;
+  const cell = (text, i, bold) => new TableCell({
+    width: { size: widths[i], type: WidthType.PERCENTAGE },
+    shading: bold ? { fill: HDR_FILL } : undefined,
+    margins: { top: 60, bottom: 60, left: 90, right: 90 },
+    children: [new Paragraph({
+      alignment: rightCols.includes(i) ? AlignmentType.RIGHT : AlignmentType.LEFT,
+      children: [new TextRun({ text: String(text), bold: !!bold, size: 19 })]
+    })]
+  });
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [
+      new TableRow({ tableHeader: true, children: headers.map((h, i) => cell(h, i, true)) }),
+      ...rows.map(r => new TableRow({ children: r.map((c, i) => cell(c, i, false)) })),
+      new TableRow({ children: totalRow.map((c, i) => cell(c, i, true)) })
+    ]
+  });
+}
+
 function docSection(D, title, intro, table){
   const { Paragraph, TextRun, HeadingLevel } = D;
   const out = [new Paragraph({
@@ -178,15 +264,28 @@ function buildDocument(D, d){
   kids.push(new Paragraph({ spacing: { after: 60 },
     children: [new TextRun({ text: 'Шүүлтийн нөхцөл: ' + filterSummary(), size: 19, bold: true })] }));
 
-  const issued = (d.kpi.find(k => k[0] === 'ОЛГОСОН ЗЭЭЛ') || [, 0])[1];
+  const kpiVal = name => (d.kpi.find(k => k[0] === name) || [, 0])[1];
+  const rm = d.rowsMain;
+  const sumOf = f => rm.reduce((a, r) => a + (r[f] || 0), 0);
+  const allMin = rm.reduce((a, r) => (r.dmin != null && (a == null || r.dmin < a)) ? r.dmin : a, null);
+  const allMax = rm.reduce((a, r) => (r.dmax != null && (a == null || r.dmax > a)) ? r.dmax : a, null);
+
   kids.push(...docSection(D, '1. Үндсэн үзүүлэлт',
-    `Сонгогдсон нөхцөлд нийт ${fmtNum(d.totalCount)} өргөдөл бүртгэгдсэн бөгөөд ` +
-    `${fmtNum(d.loanCount)} зээл олгогдож, олгосон нийт зээл ${fmtMoneyStr(issued)} болов.`,
-    docTable(D, ['Үзүүлэлт', 'Утга'],
-      [['Өргөдлийн тоо', fmtNum(d.totalCount)], ['Зээлийн тоо', fmtNum(d.loanCount)],
-       ['Хоршооны тоо', fmtNum(d.coopCount)], ['Зээлдэгчийн тоо', fmtNum(d.borrowerCount)],
-       ...d.kpi.map(([l, v]) => [l, money(v)])],
-      [60, 40], [1])));
+    `Сонгогдсон нөхцөлд нийт ${fmtNum(d.totalCount)} өргөдөл бүртгэгдэж, ` +
+    `${fmtNum(d.coopCount)} хоршооны ${fmtNum(d.borrowerCount)} гишүүнд ` +
+    `${fmtMoneyStr(kpiVal('ОЛГОСОН ЗЭЭЛ'))} зээл олгожээ. ` +
+    `Хүссэн зээлийн дүн ${fmtMoneyStr(kpiVal('ХҮССЭН ЗЭЭЛИЙН ДҮН'))}, ` +
+    `батлагдсан ${fmtMoneyStr(kpiVal('БАТЛАГДСАН ЗЭЭЛ'))}, ` +
+    `батлан даасан дүн ${fmtMoneyStr(kpiVal('БАТЛАН ДААСАН ДҮН'))} байна.`,
+    docTableWithTotal(D,
+      [d.groupHeader, 'Зээл авсан хоршооны тоо', 'Зээл авсан гишүүний тоо',
+       'Зээл авсан огноо', 'Зээлийн батлан даасан дүн', 'Зээлийн дүн'],
+      rm.map(r => [r.name, fmtNum(r.coops), fmtNum(r.members),
+                   fmtDateRange(r.dmin, r.dmax), grouped(r.gua, 0), grouped(r.amt, 0)]),
+      // Хоршоо/гишүүний нийт нь баганын нийлбэр биш, бүхэлдээ давхардаагүй тоо
+      ['Нийт', fmtNum(d.coopCount), fmtNum(d.borrowerCount),
+       fmtDateRange(allMin, allMax), grouped(sumOf('gua'), 0), grouped(sumOf('amt'), 0)],
+      [18, 14, 14, 20, 17, 17], [1, 2, 4, 5])));
 
   kids.push(...docSection(D, '2. Олгосон зээлийн дүн, аймгаар',
     'Доорх хүснэгтэд аймаг тус бүрд олгосон зээлийн нийт дүнг буурах эрэмбээр харуулав.',
