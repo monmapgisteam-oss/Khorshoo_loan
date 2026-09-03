@@ -171,7 +171,7 @@ body{
 .tab-pane.active{display:block}
 
 /* ---------- KPI ---------- */
-.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:var(--gap);flex:0 0 auto}
+.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gap);flex:0 0 auto}
 .kpi{
   background:var(--panel);border:1px solid var(--line);border-radius:4px;
   padding:6px 10px;display:flex;flex-direction:column;justify-content:center;
@@ -182,7 +182,7 @@ body{
 .kpi .k-main{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
 .kpi .k-icon{width:26px;height:26px;flex:0 0 auto;color:var(--accent);opacity:.9}
 .kpi .k-icon svg{width:100%;height:100%;fill:currentColor}
-.kpi .k-icon svg path,.kpi .k-icon svg g{fill:currentColor}
+.kpi .k-icon svg path,.kpi .k-icon svg g,.kpi .k-icon svg ellipse{fill:currentColor}
 .kpi .k-value{display:block;min-width:0;font-size:23px;font-weight:700;color:var(--accent);
   line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi-row-2{grid-template-columns:repeat(4,1fr)}

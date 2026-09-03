@@ -39,7 +39,8 @@ const KPIS = [
   { label:'ХҮССЭН ЗЭЭЛИЙН ДҮН', icon:'628461f1', stat:'sum',   field:F.requestedAmt,  kind:'money' },
   { label:'БАТЛАН ДААСАН ДҮН',  icon:'b473ec08', stat:'sum',   field:F.guaranteedAmt, kind:'money' },
   { label:'БАТЛАГДСАН ЗЭЭЛ',    icon:'228a932b', stat:'sum',   field:F.approvedAmt,   kind:'money' },
-  { label:'ОЛГОСОН ЗЭЭЛ',       icon:'fae33e87', stat:'sum',   field:F.issuedAmt,     kind:'money' }
+  { label:'ОЛГОСОН ЗЭЭЛ',       icon:'fae33e87', stat:'sum',   field:F.issuedAmt,     kind:'money' },
+  { label:'ЗЭЭЛИЙН ҮЛДЭГДЭЛ',   icon:'balance',  stat:'sum',   field:F.balance,       kind:'money' }
 ];
 
 /* Зээлийн тайлангийн 6 үзүүлэлт (шүүлтүүрт хамаарахгүй) */
