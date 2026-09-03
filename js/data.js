@@ -49,13 +49,18 @@ async function queryCount(url, where='1=1'){
   return j.count || 0;
 }
 
-/** Талбарын ялгаатай утгын тоо (жишээ нь давхардаагүй хоршооны тоо) */
+/**
+ * Талбарын ялгаатай утгын тоо (жишээ нь давхардаагүй хоршооны тоо).
+ * ArcGIS-ийн returnDistinctValues нь NULL-ийг алгасдаг тул хоосон утгыг
+ * нэг бүлэг гэж тусад нь нэмнэ — жишиг хүснэгтийн тоололтой ингэж нийцнэ.
+ */
 async function queryDistinctCount(url, field, where = '1=1'){
-  const j = await esriQuery(url, {
-    where, outFields: field,
-    returnDistinctValues: 'true', returnCountOnly: 'true'
-  });
-  return j.count || 0;
+  const [distinct, nulls] = await Promise.all([
+    esriQuery(url, { where, outFields: field,
+                     returnDistinctValues: 'true', returnCountOnly: 'true' }),
+    esriQuery(url, { where: andWhere(where, `${field} IS NULL`), returnCountOnly: 'true' })
+  ]);
+  return (distinct.count || 0) + (nulls.count > 0 ? 1 : 0);
 }
 
 /* ---------- Шүүлтүүрийн төлөв ---------- */
