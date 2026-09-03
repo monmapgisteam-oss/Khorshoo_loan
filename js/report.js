@@ -137,7 +137,7 @@ function docTable(D, headers, rows, widths, rightCols){
     margins: { top: 60, bottom: 60, left: 90, right: 90 },
     children: [new Paragraph({
       alignment: rightCols.includes(i) ? AlignmentType.RIGHT : AlignmentType.LEFT,
-      children: [new TextRun({ text: String(text), bold: !!bold, size: 22 })]
+      children: [new TextRun({ text: String(text), bold: !!bold, size: 19 })]
     })]
   });
   return new Table({
@@ -153,10 +153,10 @@ function docSection(D, title, intro, table){
   const { Paragraph, TextRun, HeadingLevel } = D;
   const out = [new Paragraph({
     heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 120 },
-    children: [new TextRun({ text: title, bold: true, size: 28, color: '111111' })]
+    children: [new TextRun({ text: title, bold: true, size: 25, color: '111111' })]
   })];
   if (intro) out.push(new Paragraph({ spacing: { after: 140 },
-    children: [new TextRun({ text: intro, size: 24 })] }));
+    children: [new TextRun({ text: intro, size: 19 })] }));
   if (table) out.push(table);
   return out;
 }
@@ -168,12 +168,12 @@ function buildDocument(D, d){
 
   kids.push(new Paragraph({
     alignment: AlignmentType.CENTER, spacing: { after: 100 },
-    children: [new TextRun({ text: 'ХОРШООНЫ ЗЭЭЛИЙН МЭДЭЭЛЭЛ ТАЙЛАН', bold: true, size: 32 })]
+    children: [new TextRun({ text: 'ХОРШООНЫ ЗЭЭЛИЙН МЭДЭЭЛЭЛ ТАЙЛАН', bold: true, size: 30 })]
   }));
   kids.push(new Paragraph({ spacing: { after: 40 },
-    children: [new TextRun({ text: 'Огноо: ' + new Date().toLocaleString('mn-MN'), size: 22 })] }));
+    children: [new TextRun({ text: 'Огноо: ' + new Date().toLocaleString('mn-MN'), size: 19 })] }));
   kids.push(new Paragraph({ spacing: { after: 60 },
-    children: [new TextRun({ text: 'Шүүлтийн нөхцөл: ' + filterSummary(), size: 22, bold: true })] }));
+    children: [new TextRun({ text: 'Шүүлтийн нөхцөл: ' + filterSummary(), size: 19, bold: true })] }));
 
   const issued = (d.kpi.find(k => k[0] === 'ОЛГОСОН ЗЭЭЛ') || [, 0])[1];
   kids.push(...docSection(D, '1. Үндсэн үзүүлэлт',
@@ -242,7 +242,7 @@ function buildDocument(D, d){
       d.livestock.map(([k, v]) => [k, grouped(v)]), [60, 40], [1])));
 
   return new Document({
-    styles: { default: { document: { run: { font: 'Times New Roman', size: 24 } } } },
+    styles: { default: { document: { run: { font: 'Times New Roman', size: 19 } } } },
     sections: [{ properties: {}, children: kids }]
   });
 }
