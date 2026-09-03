@@ -104,8 +104,9 @@ async function collectReportData(){
   ]);
 
   const clean = (rows, field) => rows.filter(r => r[field]).map(r => [r[field], r.v || 0]);
+  // Дараалал нь хүснэгтийн баганатай ижил: Аймаг -> Сум -> утга
   const soumRows = rows => rows.filter(r => r[F.soum])
-    .map(r => [r[F.soum], r[F.aimag], r.v || 0]);
+    .map(r => [r[F.aimag], r[F.soum], r.v || 0]);
   const s0 = sums[0] || {};
 
   return {
@@ -198,14 +199,14 @@ function buildDocument(D, d){
   kids.push(...docSection(D, '4. Олгосон зээлийн дүн, сумаар',
     'Доорх хүснэгтэд сум тус бүрд олгосон зээлийн нийт дүнг буурах эрэмбээр харуулав.' +
     soumNote(d.soumAmt),
-    docTable(D, ['Сум', 'Аймаг', 'Дүн'],
-      d.soumAmt.map(([s1, a, v]) => [s1, a, money(v)]), [34, 30, 36], [2])));
+    docTable(D, ['Аймаг', 'Сум', 'Дүн'],
+      d.soumAmt.map(([a, s1, v]) => [a, s1, money(v)]), [30, 34, 36], [2])));
 
   kids.push(...docSection(D, '5. Зээлийн тоо, сумаар',
     'Доорх хүснэгтэд сум тус бүрд олгосон зээлийн тоог буурах эрэмбээр харуулав.' +
     soumNote(d.soumCnt),
-    docTable(D, ['Сум', 'Аймаг', 'Тоо'],
-      d.soumCnt.map(([s1, a, v]) => [s1, a, fmtNum(v)]), [34, 30, 36], [2])));
+    docTable(D, ['Аймаг', 'Сум', 'Тоо'],
+      d.soumCnt.map(([a, s1, v]) => [a, s1, fmtNum(v)]), [30, 34, 36], [2])));
 
   kids.push(...docSection(D, '6. Зээл олгосон дүн, зориулалтаар',
     'Доорх хүснэгтэд зээлийн зориулалт тус бүрд олгосон нийт дүнг буурах эрэмбээр харуулав.',
