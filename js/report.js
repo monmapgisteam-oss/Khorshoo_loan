@@ -271,9 +271,9 @@ function buildDocument(D, d){
   const allMax = rm.reduce((a, r) => (r.dmax != null && (a == null || r.dmax > a)) ? r.dmax : a, null);
 
   kids.push(...docSection(D, '1. Үндсэн үзүүлэлт',
-    `Сонгогдсон нөхцөлд нийт ${fmtNum(d.totalCount)} өргөдөл бүртгэгдэж, ` +
+    `Нийт ${fmtNum(d.totalCount)} өргөдөл бүртгэгдэж, ` +
     `${fmtNum(d.coopCount)} хоршооны ${fmtNum(d.borrowerCount)} гишүүнд ` +
-    `${fmtMoneyStr(kpiVal('ОЛГОСОН ЗЭЭЛ'))} зээл олгожээ. ` +
+    `${fmtMoneyStr(kpiVal('ОЛГОСОН ЗЭЭЛ'))} зээл олгосон. ` +
     `Хүссэн зээлийн дүн ${fmtMoneyStr(kpiVal('ХҮССЭН ЗЭЭЛИЙН ДҮН'))}, ` +
     `батлагдсан ${fmtMoneyStr(kpiVal('БАТЛАГДСАН ЗЭЭЛ'))}, ` +
     `батлан даасан дүн ${fmtMoneyStr(kpiVal('БАТЛАН ДААСАН ДҮН'))} байна.`,
