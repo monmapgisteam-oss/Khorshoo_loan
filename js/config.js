@@ -35,10 +35,17 @@ const F = {
   coopId: 'Хоршооны_РД'
 };
 
-/* Толгойн 5 үзүүлэлт */
+/* Толгойн 7 үзүүлэлт */
 /* Нэр, дүрс нь дашбоардын indicator widget-ийн topSection / iconInfo-оос */
+/* Эхэнд хоёр тоо (хэдэн зээл / хэдэн зээлдэгч), дараа нь дүнгүүд зээлийн
+   амьдралын мөчлөгөөр: хүссэн -> батлан даасан -> батлагдсан -> олгосон ->
+   үлдэгдэл. Ингэснээр зүүнээс баруун тийш "хүсэлт -> одоогийн өр" болж уншина. */
 const KPIS = [
-  { label:'ЗЭЭЛИЙН ТОО',        icon:'5bb8df86', stat:'count', field:'OBJECTID',      extraWhere:`${F.issuedAmt} <> 0`, kind:'count' },
+  { id:'loanCount', label:'ЗЭЭЛИЙН ТОО', icon:'5bb8df86', stat:'count', field:'OBJECTID',
+    extraWhere:`${F.issuedAmt} <> 0`, kind:'count' },
+  // Тайлангийн "Үлдэгдэл — тоо" багана: үлдэгдэлтэй үлдсэн зээлдэгчид
+  { label:'ЗЭЭЛДЭГЧИЙН ТОО',    icon:'borrowers', stat:'count', field:'OBJECTID',
+    extraWhere:`${F.balance} > 0`, kind:'count' },
   { label:'ХҮССЭН ЗЭЭЛИЙН ДҮН', icon:'628461f1', stat:'sum',   field:F.requestedAmt,  kind:'money' },
   { label:'БАТЛАН ДААСАН ДҮН',  icon:'b473ec08', stat:'sum',   field:F.guaranteedAmt, kind:'money' },
   { label:'БАТЛАГДСАН ЗЭЭЛ',    icon:'228a932b', stat:'sum',   field:F.approvedAmt,   kind:'money' },
@@ -46,22 +53,15 @@ const KPIS = [
   { label:'ЗЭЭЛИЙН ҮЛДЭГДЭЛ',   icon:'balance',  stat:'sum',   field:F.balance,       kind:'money' }
 ];
 
-/* Зээлийн тайлангийн 6 үзүүлэлт (шүүлтүүрт хамаарахгүй) */
-/* 4 багана x 2 мөр. kind:'distinct' нь Khorshoo сервисээс ялгаатай утгын тоо
-   бөгөөд шүүлтүүрт захирагдана; бусад нь Зээлийн тайлангийн улсын үзүүлэлт. */
-const KPIS2 = [
-  { label:'НИЙТ ГҮЙЦЭТГЭЛ',        field:'niit_guitsetgel' },
-  { label:'ГҮЙЦЭТГЭЛ 2026',        field:'guitsetgel_2026' },
-  { label:'БАТЛАГДСАН ТӨСӨВ 2026', field:'batlagdsan_tuluw' },
-  { label:'2025 ОНЫ ӨР ТӨЛБӨРТ',   field:'ur_tulbur_2025' },
-  { label:'ХОРШООНЫ ТОО',          field:F.coopId,   kind:'distinct' },
-  { label:'ЗЭЭЛДЭГЧИЙН ТОО',       field:F.borrower, kind:'distinct' },
-  { label:'01 САР',                field:'sar_1' },
-  { label:'02 САР',                field:'sar_2' }
+/* Газрын зургийн доод мөр — он тус бүрийн төсөв ба гүйцэтгэл (төгрөгөөр).
+   Эх дашбоард дээр эдгээр нь indicator widget-ийн middleSection дэх тогтмол
+   бичвэр (statisticDefinitions-той ч үр дүнг нь ашигладаггүй) тул энд ч
+   тогтмолоор бичив. Шинэ тайлан гармагц зөвхөн эдгээр тоог солино. */
+const YEAR_KPIS = [
+  { year:'2024', budget:  25.2e9, actual: 25.1e9 },
+  { year:'2025', budget: 105.3e9, actual: 59.4e9 },
+  { year:'2026', budget:  75.9e9, actual: 62.8e9 }
 ];
-
-/* Зээлийн тайлангийн сервисээс нийлбэрээр авах үзүүлэлтүүд */
-const REPORT_KPIS = KPIS2.filter(k => k.kind !== 'distinct');
 
 /* Толгойн шүүлтүүрүүд */
 const SELECTORS = [

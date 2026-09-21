@@ -89,7 +89,7 @@ function reportFileName(){
 
 async function collectReportData(){
   const where   = buildWhere();
-  const cntKpi  = KPIS.find(k => k.kind === 'count');
+  const cntKpi  = KPIS.find(k => k.id === 'loanCount');
   const sumKpis = KPIS.filter(k => k.stat === 'sum');
 
   const byField = (field, extra) => queryStats(SVC.loans, {
@@ -107,7 +107,7 @@ async function collectReportData(){
   });
 
   const [sums, loanCount, totalCount, coopCount, borrowerCount, aimagAmt, aimagCnt, soumAmt, soumCnt, purpose, bank,
-         issuedYear, dueYear, status, report, livestock] = await Promise.all([
+         issuedYear, dueYear, status, livestock] = await Promise.all([
     queryStats(SVC.loans, { where, stats: sumKpis.map((k, i) =>
       ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
     queryCount(SVC.loans, andWhere(where, cntKpi.extraWhere)),
@@ -127,8 +127,6 @@ async function collectReportData(){
     queryStats(SVC.loans, { where: andWhere(where, `${F.status} IS NOT NULL`), groupBy: F.status,
       stats: [{ onStatisticField: 'OBJECTID', statisticType: 'count', outStatisticFieldName: 'v' }],
       orderBy: 'v DESC', limit: 100 }),
-    queryStats(SVC.report, { stats: REPORT_KPIS.map((k, i) =>
-      ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
     queryStats(SVC.livestock, { groupBy: 'aimag_name_boundary',
       stats: [{ onStatisticField: 'last_y', statisticType: 'sum', outStatisticFieldName: 'v' }],
       orderBy: 'v DESC', limit: 1000 })
@@ -188,7 +186,9 @@ async function collectReportData(){
     issuedYear: issuedYear.map(r => [r.key, r.value]),
     dueYear:    dueYear.map(r => [r.key, r.value]),
     status:    clean(status,   F.status),
-    report:    REPORT_KPIS.map((k, i) => [k.label, (report[0] || {})['s' + i] || 0]),
+    // Он бүрийн төсөв/гүйцэтгэл — тогтмол утгууд
+    years:     YEAR_KPIS.map(y => [y.year, y.budget, y.actual,
+                 y.budget ? Math.round(y.actual / y.budget * 100) : null]),
     livestock: clean(livestock, 'aimag_name_boundary')
   };
 }
@@ -339,7 +339,10 @@ function buildDocument(D, d){
 
   kids.push(...docSection(D, '11. Зээлийн тайлан (төсөв, гүйцэтгэл)',
     'Улсын хэмжээний үзүүлэлт — дээрх шүүлтүүрээс хамаарахгүй.',
-    docTable(D, ['Үзүүлэлт', 'Утга'], d.report.map(([l, v]) => [l, fmtExact(v) + '₮']), [60, 40], [1])));
+    docTable(D, ['Он', 'Төсөв', 'Гүйцэтгэл', 'Хувь'],
+      d.years.map(([y, b, a, p]) => [y, fmtExact(b) + '₮', fmtExact(a) + '₮',
+                                     p == null ? '—' : p + '%']),
+      [16, 30, 30, 24], [1, 2, 3])));
 
   kids.push(...docSection(D, '12. Малын тоо, аймгаар',
     'Улсын хэмжээний үзүүлэлт — дээрх шүүлтүүрээс хамаарахгүй.',

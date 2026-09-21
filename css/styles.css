@@ -171,22 +171,34 @@ body{
 .tab-pane.active{display:block}
 
 /* ---------- KPI ---------- */
-.kpi-row{display:grid;grid-template-columns:repeat(6,1fr);gap:var(--gap);flex:0 0 auto}
+.kpi-row{display:grid;grid-template-columns:repeat(7,1fr);gap:var(--gap);flex:0 0 auto}
 .kpi{
   background:var(--panel);border:1px solid var(--line);border-radius:4px;
-  padding:6px 10px;display:flex;flex-direction:column;justify-content:center;
+  padding:6px 7px;display:flex;flex-direction:column;justify-content:center;
   align-items:center;min-width:0;gap:2px;
 }
-.kpi .k-label{font-size:11px;letter-spacing:.5px;color:var(--txt);font-weight:600;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-.kpi .k-main{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%}
-.kpi .k-icon{width:26px;height:26px;flex:0 0 auto;color:var(--accent);opacity:.9}
+/* Шошго, дүрс, тоо гурвуулаа дэлгэцийн өргөнд дасан зохицоно — 7 үзүүлэлт
+   нэг мөрөнд багтаж, "908.9тэр…" гэж таслагдахгүй байх нь зорилго */
+.kpi .k-label{font-size:clamp(9px,.72vw,11px);letter-spacing:.3px;color:var(--txt);
+  font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.kpi .k-main{display:flex;align-items:center;gap:clamp(3px,.4vw,8px);min-width:0;max-width:100%}
+.kpi .k-icon{width:clamp(15px,1.2vw,22px);height:clamp(15px,1.2vw,22px);
+  flex:0 0 auto;color:var(--accent);opacity:.9}
 .kpi .k-icon svg{width:100%;height:100%;fill:currentColor}
 .kpi .k-icon svg path,.kpi .k-icon svg g,.kpi .k-icon svg ellipse{fill:currentColor}
-.kpi .k-value{display:block;min-width:0;font-size:23px;font-weight:700;color:var(--accent);
-  line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.kpi-row-2{grid-template-columns:repeat(4,1fr)}
-.kpi-row-2 .kpi .k-value{font-size:15px;color:var(--accent-2);letter-spacing:-.2px}
+.kpi .k-value{display:block;min-width:0;font-size:clamp(13px,1.05vw,20px);font-weight:700;
+  color:var(--accent);line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Он тус бүр нэг нүд: гарчиг нь он, дотор нь төсөв / гүйцэтгэл / хувь */
+.kpi-row-2{grid-template-columns:repeat(3,1fr)}
+.year-kpi{padding:5px 12px;align-items:stretch;gap:3px}
+.year-kpi .y-year{font-size:12px;font-weight:700;letter-spacing:1px;color:var(--txt);
+  text-align:center;border-bottom:1px solid var(--line);padding-bottom:3px}
+.year-kpi .y-rows{display:grid;grid-template-columns:auto 1fr;gap:1px 10px;align-items:baseline}
+.year-kpi .y-key{font-size:11px;color:var(--txt-dim);white-space:nowrap}
+.year-kpi .y-val{font-size:15px;font-weight:700;color:var(--accent-2);text-align:right;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.year-kpi .y-act{color:var(--accent)}
+.year-kpi .y-pct{font-size:13px;color:var(--txt)}
 
 /* ---------- Middle row ---------- */
 .mid-row{display:grid;grid-template-columns:18.7% 1fr 24%;gap:var(--gap);flex:1 1 47%;min-height:0}
@@ -224,8 +236,9 @@ body{
 ::-webkit-scrollbar-track{background:transparent}
 
 @media (max-width:1400px){
-  .kpi .k-value{font-size:18px}
-  .kpi-row-2 .kpi .k-value{font-size:12.5px}
+  /* .kpi .k-value нь clamp()-аар өөрөө багасна */
+  .year-kpi .y-val{font-size:13px}
+  .year-kpi .y-pct{font-size:11.5px}
   .tab{font-size:9px}
 }
 @media (max-width:1100px){

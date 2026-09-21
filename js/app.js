@@ -13,9 +13,18 @@ $('#kpiRow').innerHTML = KPIS.map((k, i) =>
        <span class="k-value" id="kpi${i}">—</span>
      </div></div>`).join('');
 
-$('#kpiRow2').innerHTML = KPIS2.map((k, i) =>
-  `<div class="kpi"><div class="k-label">${k.label}</div>
-     <div class="k-value" id="kpi2_${i}">—</div></div>`).join('');
+/* Он бүр нэг нүд: төсөв ба гүйцэтгэл зэрэгцэн, хажууд нь гүйцэтгэлийн хувь */
+$('#kpiRow2').innerHTML = YEAR_KPIS.map(y => {
+  const pct = y.budget ? Math.round(y.actual / y.budget * 100) : null;
+  return `<div class="kpi year-kpi">
+    <div class="y-year">${y.year} ОН</div>
+    <div class="y-rows">
+      <span class="y-key">Төсөв</span><span class="y-val">${fmtMoneyStr(y.budget)}</span>
+      <span class="y-key">Гүйцэтгэл</span><span class="y-val y-act">${fmtMoneyStr(y.actual)}</span>
+      <span class="y-key">Хувь</span><span class="y-val y-pct">${pct == null ? '—' : pct + '%'}</span>
+    </div>
+  </div>`;
+}).join('');
 
 /* ===== 2. Табууд (самбарын доод талд, гарчиг нь идэвхтэй табын нэр) ===== */
 function activateTab(group, btn){
@@ -283,18 +292,12 @@ function refresh() {
     sumFields.forEach((k, i) => setKpi('#kpi' + KPIS.indexOf(k), a['s' + i] || 0));
   });
 
-  const cnt = KPIS.find(k => k.kind === 'count');
-  queryCount(SVC.loans, andWhere(where, cnt.extraWhere)).then(n => {
-    $('#kpi' + KPIS.indexOf(cnt)).textContent = fmtNum(n);
+  KPIS.forEach((k, i) => {
+    if (k.kind !== 'count') return;
+    queryCount(SVC.loans, andWhere(where, k.extraWhere))
+      .then(n => { $('#kpi' + i).textContent = fmtNum(n); });
   });
   queryCount(SVC.loans, where).then(n => { $('#mapCount').textContent = fmtNum(n); });
-
-  /* --- Хоршоо / зээлдэгчийн давхардаагүй тоо --- */
-  KPIS2.forEach((k, i) => {
-    if (k.kind !== 'distinct') return;
-    queryDistinctCount(SVC.loans, k.field, where)
-      .then(n => { $('#kpi2_' + i).textContent = fmtNum(n); });
-  });
 
   /* --- Аймгаар: олгосон дүн / зээлийн тоо --- */
   queryStats(SVC.loans, {
@@ -371,18 +374,9 @@ function drawLivestock(){
 }
 
 function setKpi(sel, value)      { $(sel).textContent = fmtMoneyStr(value); }
-function setKpiExact(sel, value) { $(sel).textContent = fmtExact(value); }
 
 /* ===== 6. Шүүлтүүрт хамаарахгүй виджетүүд (нэг удаа) ===== */
 function loadStaticWidgets() {
-  // Зээлийн тайлангийн 6 үзүүлэлт
-  queryStats(SVC.report, {
-    stats: REPORT_KPIS.map((k, i) => ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i }))
-  }).then(rows => {
-    const a = rows[0] || {};
-    REPORT_KPIS.forEach((k, i) => setKpiExact('#kpi2_' + KPIS2.indexOf(k), a['s' + i] || 0));
-  });
-
   // Малын тоо аймгаар — тоо нь шүүлтүүрээс хамаарахгүй ч сонгосон аймаг
   // тодрох ёстой тул нэг удаа татаад кэшлэнэ
   queryStats(SVC.livestock, {
