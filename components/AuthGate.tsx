@@ -27,7 +27,6 @@ export default function AuthGate({ children }: { children: ReactNode }) {
         )}
         {auth.status === 'signed-out' && (
           <>
-            <p>Энэ мэдээллийг үзэхийн тулд ArcGIS Online бүртгэлээрээ нэвтэрнэ үү.</p>
             {auth.error && <p className="auth-error">{auth.error}</p>}
             <button className="auth-btn" onClick={signIn}>ArcGIS Online-оор нэвтрэх</button>
           </>
