@@ -1,23 +1,27 @@
 /* ---------- Chart.js тохиргоо ---------- */
+/* Зөвхөн хөтөч дээр ачаалагдана (Dashboard-ыг ssr:false-оор оруулдаг). */
 
-if (typeof Chart === 'undefined') {
-  console.error('Chart.js ачаалагдсангүй — CDN хаягаа шалгана уу. График харагдахгүй.');
-}
+import Chart from 'chart.js/auto';
+import { PALETTE } from './config';
+import { fmtMoneyStr, fmtNum, fmtAxis, fmtAxisMn, truncate } from './data';
 
 Chart.defaults.color = '#89a0ac';
 Chart.defaults.font.family = '"Segoe UI",Roboto,Arial,sans-serif';
 Chart.defaults.font.size = 11;
 Chart.defaults.maintainAspectRatio = false;
-Chart.defaults.animation.duration = 350;
+(Chart.defaults.animation as any).duration = 350;
 
-const charts = {};
+export type Row = { key: any; value: number };
+
+/** Canvas id -> Chart instance (нэмэлт $full, $onSelect, $padRight талбартай) */
+export const charts: Record<string, any> = {};
 
 /* Бүх графикийн утгын шошго: цагаан, тод биш */
 const LABEL_FONT  = '10px "Segoe UI",Roboto,Arial,sans-serif';
 const LABEL_COLOR = '#ffffff';
 
 /** '#22d3ee' -> 'rgba(34,211,238,a)' */
-function alpha(hex, a){
+function alpha(hex: string, a: number){
   const h = hex.replace('#','');
   const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
@@ -25,14 +29,19 @@ function alpha(hex, a){
 
 const FILL_ALPHA = .18;
 
-/** Текстийн өргөнийг графикаас гадуур хэмжих туслах canvas */
-const _measureCtx = document.createElement('canvas').getContext('2d');
-function textWidth(t, font = LABEL_FONT){ _measureCtx.font = font; return _measureCtx.measureText(t).width; }
+/** Текстийн өргөнийг графикаас гадуур хэмжих туслах canvas (хэрэгтэй үед л үүсгэнэ) */
+let _measureCtx: CanvasRenderingContext2D | null = null;
+function textWidth(t: string, font = LABEL_FONT){
+  if (!_measureCtx) _measureCtx = document.createElement('canvas').getContext('2d');
+  if (!_measureCtx) return t.length * 6;
+  _measureCtx.font = font;
+  return _measureCtx.measureText(t).width;
+}
 
 /** Урт нэрийг тултипт багтаахаар мөр болгон таслана */
-function wrapForTooltip(text, maxChars = 42){
+function wrapForTooltip(text: unknown, maxChars = 42){
   const words = String(text).split(/\s+/);
-  const lines = [];
+  const lines: string[] = [];
   let cur = '';
   for (const w of words){
     const t = cur ? cur + ' ' + w : w;
@@ -44,17 +53,19 @@ function wrapForTooltip(text, maxChars = 42){
 }
 
 /** Идэвхтэй мөрийн өнгийг тултипын цэгэнд ашиглах */
-function tooltipDotColor(it){
+function tooltipDotColor(it: any){
   const bc = it.dataset.borderColor;
   const c = Array.isArray(bc) ? bc[it.dataIndex] : bc;
   return { borderColor: c, backgroundColor: c, borderWidth: 0 };
 }
 
+type Fmt = (v: any) => string;
+
 /**
- * @param {'x'|'y'} valueAxis - утга уншигдах тэнхлэг
- * @param {string} [measure]  - утгын өмнө бичих хэмжигдэхүүний нэр
+ * @param valueAxis - утга уншигдах тэнхлэг
+ * @param measure   - утгын өмнө бичих хэмжигдэхүүний нэр
  */
-function tooltipCfg(valueFmt, valueAxis, measure){
+function tooltipCfg(valueFmt: Fmt, valueAxis: 'x' | 'y', measure?: string){
   return {
     backgroundColor:'#060c10',
     borderColor: PALETTE[0], borderWidth:1, cornerRadius:6,
@@ -65,13 +76,13 @@ function tooltipCfg(valueFmt, valueAxis, measure){
     caretSize:6,
     callbacks:{
       labelColor: tooltipDotColor,
-      title: items => {
+      title: (items: any[]) => {
         const full = items[0].chart.$full;
         const t = (full && full[items[0].dataIndex]) || items[0].label;
         const lines = wrapForTooltip(Array.isArray(t) ? t.join(' ') : t);
         return lines.map((l, i) => (i === 0 ? '• ' : '   ') + l);
       },
-      label: it => (measure ? measure + ': ' : '') + valueFmt(it.parsed[valueAxis])
+      label: (it: any) => (measure ? measure + ': ' : '') + valueFmt(it.parsed[valueAxis])
     }
   };
 }
@@ -79,7 +90,7 @@ function tooltipCfg(valueFmt, valueAxis, measure){
 /* ---------- Плагин: багана / цэг дээрх утгын шошго ---------- */
 const dataLabels = {
   id:'dataLabels',
-  afterDatasetsDraw(chart, _args, opts){
+  afterDatasetsDraw(chart: any, _args: any, opts: any){
     if (!opts || !opts.formatter) return;
     const { ctx } = chart;
     const ds = chart.data.datasets[0];
@@ -88,7 +99,7 @@ const dataLabels = {
     ctx.textBaseline = 'middle';
     ctx.fillStyle = opts.color || LABEL_COLOR;
 
-    chart.getDatasetMeta(0).data.forEach((el, i) => {
+    chart.getDatasetMeta(0).data.forEach((el: any, i: number) => {
       const raw = ds.data[i];
       const v = (raw && typeof raw === 'object') ? raw[opts.axis] : raw;
       if (v == null) return;
@@ -120,11 +131,11 @@ const dataLabels = {
 /* ---------- Плагин: бөгжний гадна талын шошго + холбоос шугам ---------- */
 const donutLabels = {
   id:'donutLabels',
-  afterDatasetsDraw(chart, _args, opts){
+  afterDatasetsDraw(chart: any, _args: any, opts: any){
     if (!opts || opts.display === false) return;
     const { ctx } = chart;
     const ds = chart.data.datasets[0];
-    const total = ds.data.reduce((a, b) => a + b, 0) || 1;
+    const total = ds.data.reduce((a: number, b: number) => a + b, 0) || 1;
     const minPct = opts.minPercent != null ? opts.minPercent : 2;
     const maxW = opts.maxWidth || 74;
     const LH = 12;
@@ -133,7 +144,7 @@ const donutLabels = {
     ctx.font = LABEL_FONT;
     ctx.textBaseline = 'middle';
 
-    chart.getDatasetMeta(0).data.forEach((arc, i) => {
+    chart.getDatasetMeta(0).data.forEach((arc: any, i: number) => {
       const v = ds.data[i];
       const pct = v / total * 100;
       if (!v || pct < minPct) return;
@@ -167,8 +178,8 @@ const donutLabels = {
 };
 
 /** Үгээр таслан мөр болгох */
-function wrapLines(text, maxW){
-  const lines = [];
+function wrapLines(text: string, maxW: number){
+  const lines: string[] = [];
   let cur = '';
   for (const w of text.split(/\s+/)){
     const t = cur ? cur + ' ' + w : w;
@@ -190,7 +201,7 @@ function wrapLines(text, maxW){
    Далд таб идэвхжих, цонх томрох үед ч шошго багана дээр давхцахгүй. */
 const barPadding = {
   id:'barPadding',
-  beforeLayout(chart){
+  beforeLayout(chart: any){
     if (!chart.$padRight) return;
     chart.options.layout.padding.right = chart.width
       ? Math.min(chart.$padRight, chart.width * .45)
@@ -198,19 +209,56 @@ const barPadding = {
   }
 };
 
-Chart.register(dataLabels, donutLabels, barPadding);
+Chart.register(dataLabels as any, donutLabels as any, barPadding as any);
+
+/**
+ * Canvas-ыг бэлтгэнэ. React StrictMode (dev) дээр компонент хоёр удаа
+ * mount хийгддэг тул хуучин canvas-д холбогдсон эсвэл бүртгэлгүй үлдсэн
+ * Chart байвал устгаж, "Canvas is already in use" алдаанаас сэргийлнэ.
+ */
+function prepareCanvas(id: string): HTMLCanvasElement | null {
+  const canvas = document.getElementById(id) as HTMLCanvasElement | null;
+  if (!canvas) return null;
+  if (charts[id] && charts[id].canvas !== canvas){
+    charts[id].destroy();
+    delete charts[id];
+  }
+  if (!charts[id]){
+    const stale = Chart.getChart(canvas);
+    if (stale) stale.destroy();
+  }
+  return canvas;
+}
+
+/** Бүх графикийг дахин хэмжинэ (таб солигдох, цонх томрох үед) */
+export function resizeAllCharts(){
+  Object.values(charts).forEach(c => c.resize());
+}
+
+/** Бүх графикийг устгана (Dashboard unmount) */
+export function destroyAllCharts(){
+  Object.keys(charts).forEach(id => { charts[id].destroy(); delete charts[id]; });
+}
 
 /* ---------- Хэвтээ баганан график ---------- */
-/**
- * @param {object} o
- * @param {function} [o.axisLabel] - тэнхлэгт харагдах богино нэр (hover дээр бүтнээрээ)
- * @param {function} [o.selected]  - key => сонгогдсон эсэх (тодруулж харуулна)
- * @param {function} [o.onSelect]  - багана дээр дарахад key-гээр дуудагдана
- * @param {number} [o.wrapLabels] - ангиллын нэрийг энэ өргөнд багтаан мөр болгож таслах
- */
-function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0],
-                               measure, axisLabel, wrapLabels, selected, onSelect } = {}){
-  const ctx = document.getElementById(id);
+export interface HBarOpts {
+  valueFmt?: Fmt;
+  labelFmt?: Fmt;
+  color?: string;
+  measure?: string;
+  /** тэнхлэгт харагдах богино нэр (hover дээр бүтнээрээ) */
+  axisLabel?: (k: string) => string;
+  /** ангиллын нэрийг энэ өргөнд багтаан мөр болгож таслах */
+  wrapLabels?: number;
+  /** key => сонгогдсон эсэх (тодруулж харуулна) */
+  selected?: (k: string) => boolean;
+  /** багана дээр дарахад key-гээр дуудагдана */
+  onSelect?: (k: string) => void;
+}
+
+export function hBarChart(id: string, rows: Row[], { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0],
+                               measure, axisLabel, wrapLabels, selected, onSelect }: HBarOpts = {}){
+  const ctx = prepareCanvas(id);
   if (!ctx) return;
   const fmtLbl = labelFmt || valueFmt;
   const full   = rows.map(r => r.key == null ? '(хоосон)' : String(r.key));
@@ -224,7 +272,7 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
   // barPadding плагин зурах бүрд хийнэ (далд таб дээр өргөн нь 0 байдаг).
   const padRight = Math.min(130, Math.max(...values.map(v => textWidth(fmtLbl(v))), 0) + 12);
 
-  const isOn   = k => !!(selected && selected(k));
+  const isOn   = (k: string) => !!(selected && selected(k));
   const fills  = full.map(k => alpha(color, isOn(k) ? .55 : FILL_ALPHA));
   const strokes = full.map(k => isOn(k) ? '#ffffff' : color);
 
@@ -253,11 +301,11 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
     options:{
       indexAxis:'y',
       layout:{ padding:{ right:padRight } },
-      onClick(evt, els, chart){
+      onClick(_evt: any, els: any[], chart: any){
         if (!chart.$onSelect || !els.length) return;
         chart.$onSelect(chart.$full[els[0].index]);
       },
-      onHover(evt, els, chart){
+      onHover(_evt: any, els: any[], chart: any){
         if (chart.$onSelect) chart.canvas.style.cursor = els.length ? 'pointer' : 'default';
       },
       plugins:{
@@ -272,7 +320,7 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
             ticks:{ autoSkip:false, font:{ size:10 } } }
       }
     }
-  });
+  } as any);
   charts[id].$full = full;
   charts[id].$onSelect = onSelect;
   charts[id].$padRight = padRight;
@@ -281,13 +329,13 @@ function hBarChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
 /* ---------- Талбайт график (он / хугацааны цуваа) ---------- */
 
 /** Утгын хүрээ 100 дахин зөрөх ба бүгд эерэг үед логарифм тэнхлэг тохиромжтой */
-function shouldUseLog(values){
+function shouldUseLog(values: number[]){
   const pos = values.filter(v => v > 0);
   if (pos.length < values.length || pos.length < 3) return false;
   return Math.max(...pos) / Math.min(...pos) > 100;
 }
 
-const areaFill = color => c => {
+const areaFill = (color: string) => (c: any) => {
   const { chart } = c;
   if (!chart.chartArea) return alpha(color, .2);
   const g = chart.ctx.createLinearGradient(0, chart.chartArea.top, 0, chart.chartArea.bottom);
@@ -296,8 +344,10 @@ const areaFill = color => c => {
   return g;
 };
 
-function areaChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0], measure } = {}){
-  const ctx = document.getElementById(id);
+export interface AreaOpts { valueFmt?: Fmt; labelFmt?: Fmt; color?: string; measure?: string }
+
+export function areaChart(id: string, rows: Row[], { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE[0], measure }: AreaOpts = {}){
+  const ctx = prepareCanvas(id);
   if (!ctx) return;
   const labels = rows.map(r => String(r.key));
   const values = rows.map(r => r.value);
@@ -335,12 +385,14 @@ function areaChart(id, rows, { valueFmt = fmtMoneyStr, labelFmt, color = PALETTE
         x:{ grid:{ display:false }, border:{ display:false } }
       }
     }
-  });
+  } as any);
 }
 
 /* ---------- Бөгж диаграм ---------- */
-function donutChart(id, rows, { valueFmt = fmtNum, measure } = {}){
-  const ctx = document.getElementById(id);
+export interface DonutOpts { valueFmt?: Fmt; measure?: string }
+
+export function donutChart(id: string, rows: Row[], { valueFmt = fmtNum, measure }: DonutOpts = {}){
+  const ctx = prepareCanvas(id);
   if (!ctx) return;
   const labels = rows.map(r => r.key == null ? '(хоосон)' : String(r.key));
   const values = rows.map(r => r.value);
@@ -376,9 +428,9 @@ function donutChart(id, rows, { valueFmt = fmtNum, measure } = {}){
           displayColors:true, usePointStyle:true, boxWidth:7, boxHeight:7, boxPadding:5,
           callbacks:{
             labelColor: tooltipDotColor,
-            title: items => wrapForTooltip(items[0].label).map((l, i) => (i === 0 ? '• ' : '   ') + l),
-            label: it => {
-              const sum = it.dataset.data.reduce((a, b) => a + b, 0) || 1;
+            title: (items: any[]) => wrapForTooltip(items[0].label).map((l, i) => (i === 0 ? '• ' : '   ') + l),
+            label: (it: any) => {
+              const sum = it.dataset.data.reduce((a: number, b: number) => a + b, 0) || 1;
               const pct = (it.parsed / sum * 100).toFixed(2);
               return `${measure ? measure + ': ' : ''}${valueFmt(it.parsed)} (${pct}%)`;
             }
@@ -386,5 +438,5 @@ function donutChart(id, rows, { valueFmt = fmtNum, measure } = {}){
         }
       }
     }
-  });
+  } as any);
 }

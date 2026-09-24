@@ -1,0 +1,29 @@
+{
+  "name": "khorshoo-loan",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Хоршооны зээлийн мэдээлэл — ArcGIS dashboard-ийн Next.js веб апп",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "npx serve out",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@arcgis/core": "4.31.6",
+    "chart.js": "4.5.1",
+    "docx": "9.7.1",
+    "next": "15.5.26",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.5.26",
+    "typescript": "^5"
+  }
+}

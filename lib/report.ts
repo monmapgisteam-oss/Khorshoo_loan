@@ -1,19 +1,25 @@
 /* ---------- Word тайлан ----------
    Дэлгэц дээр харагдаж буй бүх үзүүлэлтийг идэвхтэй шүүлтүүрийн хамт
-   .docx болгон татаж авна. Бүтэц нь Khorshoo_tailan_*.docx загварыг дагасан. */
+   .docx болгон татаж авна. Бүтэц нь Khorshoo_tailan_*.docx загварыг дагасан.
 
-const DOCX_CDN = 'https://cdn.jsdelivr.net/npm/docx@9.7.1/dist/index.iife.min.js';
+   `docx` санг dynamic import-оор зөвхөн товч дарах үед ачаална — Next.js
+   үүнийг тусдаа chunk болгодог тул нүүр хуудасны ачаалалд нөлөөлөхгүй
+   (хуучин CDN-ээс script нэмдэг байсантай ижил зарчим). */
 
-/** docx санг зөвхөн товч дарах үед нэг удаа ачаална (408KB) */
-let _docxPromise = null;
-function loadDocx(){
-  if (window.docx) return Promise.resolve(window.docx);
-  if (!_docxPromise) _docxPromise = new Promise((resolve, reject) => {
-    const el = document.createElement('script');
-    el.src = DOCX_CDN;
-    el.onload  = () => resolve(window.docx);
-    el.onerror = () => { _docxPromise = null; reject(new Error('docx сан ачаалагдсангүй')); };
-    document.head.appendChild(el);
+import { F, KPIS, NUM_PREFIX, SELECTORS, SOUM_LIMIT, SVC, YEAR_KPIS, purposeCode } from './config';
+import {
+  andWhere, buildWhere, filters, fmtExact, fmtMoneyStr, fmtNum, grouped,
+  queryCount, queryDistinctCount, queryStats, sqlStr, type Attributes
+} from './data';
+import { statsByYear } from './dashboard';
+
+type Docx = typeof import('docx');
+
+let _docxPromise: Promise<Docx> | null = null;
+function loadDocx(): Promise<Docx> {
+  if (!_docxPromise) _docxPromise = import('docx').catch(err => {
+    _docxPromise = null;
+    throw new Error('docx сан ачаалагдсангүй: ' + (err && err.message ? err.message : err));
   });
   return _docxPromise;
 }
@@ -21,7 +27,7 @@ function loadDocx(){
 /* ---------- Туслах форматууд ---------- */
 
 /** Хүснэгтэд: "73.8 тэрбум₮" */
-function fmtMoneyDoc(v){
+function fmtMoneyDoc(v: any){
   if (v == null || isNaN(v)) return '—';
   const a = Math.abs(v);
   for (const [mul, unit] of NUM_PREFIX){
@@ -31,23 +37,23 @@ function fmtMoneyDoc(v){
 }
 
 /** Огноог YYYY.MM.DD болгох (ArcGIS UTC миллисекунд буцаадаг) */
-function fmtDate(ms){
+function fmtDate(ms: number | null | undefined){
   if (ms == null) return '';
   const d = new Date(ms);
-  const p = n => String(n).padStart(2, '0');
+  const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}.${p(d.getUTCMonth() + 1)}.${p(d.getUTCDate())}`;
 }
 
 /** Хугацааны муж: ижил бол нэг огноо */
-function fmtDateRange(min, max){
+function fmtDateRange(min: number | null | undefined, max: number | null | undefined){
   const a = fmtDate(min), b = fmtDate(max);
   if (!a && !b) return '';
   return a === b ? a : `${a} - ${b}`;
 }
 
 /** Зэрэг явуулах хүсэлтийн тоог хязгаарлан гүйцэтгэнэ */
-async function withLimit(items, limit, fn){
-  const out = new Array(items.length);
+async function withLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
   let next = 0;
   const worker = async () => {
     while (next < items.length){
@@ -60,12 +66,12 @@ async function withLimit(items, limit, fn){
 }
 
 /** Идэвхтэй шүүлтүүрийн тайлбар */
-function filterSummary(){
-  const parts = [];
+export function filterSummary(){
+  const parts: string[] = [];
   SELECTORS.forEach(c => {
     const sel = [...filters[c.field]];
     if (!sel.length) return;
-    const lbl = v => (c.labelOverrides && c.labelOverrides[v]) || v;
+    const lbl = (v: string) => (c.labelOverrides && c.labelOverrides[v]) || v;
     parts.push(`${c.label}: ${sel.map(lbl).join(', ')}`);
   });
   if (filters.dateFrom || filters.dateTo){
@@ -87,12 +93,14 @@ function reportFileName(){
 
 /* ---------- Өгөгдөл цуглуулах ---------- */
 
+interface MainRow { name: string; coops: number; members: number; dmin: number | null; dmax: number | null; gua: number; amt: number; bal: number }
+
 async function collectReportData(){
   const where   = buildWhere();
-  const cntKpi  = KPIS.find(k => k.id === 'loanCount');
+  const cntKpi  = KPIS.find(k => k.id === 'loanCount')!;
   const sumKpis = KPIS.filter(k => k.stat === 'sum');
 
-  const byField = (field, extra) => queryStats(SVC.loans, {
+  const byField = (field: string, extra?: string) => queryStats(SVC.loans, {
     where: extra ? andWhere(where, extra) : where,
     groupBy: field,
     stats: [{ onStatisticField: F.issuedAmt, statisticType: 'sum', outStatisticFieldName: 'v' }],
@@ -100,7 +108,7 @@ async function collectReportData(){
   });
 
   // Сумын нэр аймаг хооронд давхардна тул аймаг-сумын хосоор бүлэглэнэ
-  const bySoum = (field, type) => queryStats(SVC.loans, {
+  const bySoum = (field: string, type: 'sum' | 'count') => queryStats(SVC.loans, {
     where, groupBy: `${F.soum},${F.aimag}`,
     stats: [{ onStatisticField: field, statisticType: type, outStatisticFieldName: 'v' }],
     orderBy: 'v DESC', limit: SOUM_LIMIT
@@ -109,7 +117,7 @@ async function collectReportData(){
   const [sums, loanCount, totalCount, coopCount, borrowerCount, aimagAmt, aimagCnt, soumAmt, soumCnt, purpose, bank,
          issuedYear, dueYear, status, livestock] = await Promise.all([
     queryStats(SVC.loans, { where, stats: sumKpis.map((k, i) =>
-      ({ onStatisticField: k.field, statisticType: 'sum', outStatisticFieldName: 's' + i })) }),
+      ({ onStatisticField: k.field, statisticType: 'sum' as const, outStatisticFieldName: 's' + i })) }),
     queryCount(SVC.loans, andWhere(where, cntKpi.extraWhere)),
     queryCount(SVC.loans, where),
     queryDistinctCount(SVC.loans, F.coopId, where),
@@ -150,7 +158,7 @@ async function collectReportData(){
   });
 
   // Давхардаагүй тоог бүлэг тус бүрд нь сервер талд тоолуулна
-  const groups = breakdown.filter(r => r[groupField]).map(r => r[groupField]);
+  const groups: string[] = breakdown.filter(r => r[groupField]).map(r => r[groupField]);
   const counts = await withLimit(groups, 6, async g => {
     const w = andWhere(where, `${groupField} = ${sqlStr(g)}`);
     const [coops, members] = await Promise.all([
@@ -160,15 +168,16 @@ async function collectReportData(){
     return { coops, members };
   });
 
-  const rowsMain = groups.map((g, i) => {
-    const r = breakdown.find(x => x[groupField] === g);
+  const rowsMain: MainRow[] = groups.map((g, i) => {
+    const r = breakdown.find(x => x[groupField] === g)!;
     return { name: g, coops: counts[i].coops, members: counts[i].members,
              dmin: r.dmin, dmax: r.dmax, gua: r.gua || 0, amt: r.amt || 0, bal: r.bal || 0 };
   });
 
-  const clean = (rows, field) => rows.filter(r => r[field]).map(r => [r[field], r.v || 0]);
+  const clean = (rows: Attributes[], field: string): [string, number][] =>
+    rows.filter(r => r[field]).map(r => [r[field], r.v || 0]);
   // Дараалал нь хүснэгтийн баганатай ижил: Аймаг -> Сум -> утга
-  const soumRows = rows => rows.filter(r => r[F.soum])
+  const soumRows = (rows: Attributes[]): [string, string, number][] => rows.filter(r => r[F.soum])
     .map(r => [r[F.aimag], r[F.soum], r.v || 0]);
   const s0 = sums[0] || {};
 
@@ -176,30 +185,34 @@ async function collectReportData(){
     where, loanCount, totalCount, coopCount, borrowerCount,
     groupHeader: oneAimag ? `${oneAimag} аймаг` : 'Аймаг',
     rowsMain,
-    kpi: sumKpis.map((k, i) => [k.label, s0['s' + i] || 0]),
+    kpi: sumKpis.map((k, i) => [k.label, s0['s' + i] || 0] as [string, number]),
     aimagAmt:  clean(aimagAmt, F.aimag),
     aimagCnt:  clean(aimagCnt, F.aimag),
     soumAmt:   soumRows(soumAmt),
     soumCnt:   soumRows(soumCnt),
     purpose:   clean(purpose,  F.purpose),
     bank:      clean(bank,     F.bank),
-    issuedYear: issuedYear.map(r => [r.key, r.value]),
-    dueYear:    dueYear.map(r => [r.key, r.value]),
+    issuedYear: issuedYear.map(r => [r.key, r.value] as [any, number]),
+    dueYear:    dueYear.map(r => [r.key, r.value] as [any, number]),
     status:    clean(status,   F.status),
     // Он бүрийн төсөв/гүйцэтгэл — тогтмол утгууд
     years:     YEAR_KPIS.map(y => [y.year, y.budget, y.actual,
-                 y.budget ? Math.round(y.actual / y.budget * 100) : null]),
+                 y.budget ? Math.round(y.actual / y.budget * 100) : null] as [string, number, number, number | null]),
     livestock: clean(livestock, 'aimag_name_boundary')
   };
 }
+
+type ReportData = Awaited<ReturnType<typeof collectReportData>>;
 
 /* ---------- Баримт угсрах ---------- */
 
 const HDR_FILL = 'E2EAEE';
 
-function docTable(D, headers, rows, widths, rightCols){
+type Cell = string | number;
+
+function docTable(D: Docx, headers: string[], rows: Cell[][], widths: number[], rightCols: number[]){
   const { Table, TableRow, TableCell, Paragraph, TextRun, WidthType, AlignmentType } = D;
-  const cell = (text, i, bold) => new TableCell({
+  const cell = (text: Cell, i: number, bold: boolean) => new TableCell({
     width: { size: widths[i], type: WidthType.PERCENTAGE },
     shading: bold ? { fill: HDR_FILL } : undefined,
     margins: { top: 60, bottom: 60, left: 90, right: 90 },
@@ -218,9 +231,9 @@ function docTable(D, headers, rows, widths, rightCols){
 }
 
 /** Сүүлийн мөрийг тодруулсан хүснэгт (нийт дүн) */
-function docTableWithTotal(D, headers, rows, totalRow, widths, rightCols){
+function docTableWithTotal(D: Docx, headers: string[], rows: Cell[][], totalRow: Cell[], widths: number[], rightCols: number[]){
   const { Table, TableRow, TableCell, Paragraph, TextRun, WidthType, AlignmentType } = D;
-  const cell = (text, i, bold) => new TableCell({
+  const cell = (text: Cell, i: number, bold: boolean) => new TableCell({
     width: { size: widths[i], type: WidthType.PERCENTAGE },
     shading: bold ? { fill: HDR_FILL } : undefined,
     margins: { top: 60, bottom: 60, left: 90, right: 90 },
@@ -239,9 +252,9 @@ function docTableWithTotal(D, headers, rows, totalRow, widths, rightCols){
   });
 }
 
-function docSection(D, title, intro, table){
+function docSection(D: Docx, title: string, intro: string, table: InstanceType<Docx['Table']>){
   const { Paragraph, TextRun, HeadingLevel } = D;
-  const out = [new Paragraph({
+  const out: (InstanceType<Docx['Paragraph']> | InstanceType<Docx['Table']>)[] = [new Paragraph({
     heading: HeadingLevel.HEADING_1, spacing: { before: 300, after: 120 },
     children: [new TextRun({ text: title, bold: true, size: 25, color: '111111' })]
   })];
@@ -251,10 +264,10 @@ function docSection(D, title, intro, table){
   return out;
 }
 
-function buildDocument(D, d){
+function buildDocument(D: Docx, d: ReportData){
   const { Document, Paragraph, TextRun, AlignmentType } = D;
-  const money = v => fmtMoneyDoc(v);
-  const kids = [];
+  const money = (v: number) => fmtMoneyDoc(v);
+  const kids: (InstanceType<Docx['Paragraph']> | InstanceType<Docx['Table']>)[] = [];
 
   kids.push(new Paragraph({
     alignment: AlignmentType.CENTER, spacing: { after: 100 },
@@ -265,11 +278,11 @@ function buildDocument(D, d){
   kids.push(new Paragraph({ spacing: { after: 60 },
     children: [new TextRun({ text: 'Шүүлтийн нөхцөл: ' + filterSummary(), size: 19, bold: true })] }));
 
-  const kpiVal = name => (d.kpi.find(k => k[0] === name) || [, 0])[1];
+  const kpiVal = (name: string) => (d.kpi.find(k => k[0] === name) || [, 0])[1] as number;
   const rm = d.rowsMain;
-  const sumOf = f => rm.reduce((a, r) => a + (r[f] || 0), 0);
-  const allMin = rm.reduce((a, r) => (r.dmin != null && (a == null || r.dmin < a)) ? r.dmin : a, null);
-  const allMax = rm.reduce((a, r) => (r.dmax != null && (a == null || r.dmax > a)) ? r.dmax : a, null);
+  const sumOf = (f: 'gua' | 'amt' | 'bal') => rm.reduce((a, r) => a + (r[f] || 0), 0);
+  const allMin = rm.reduce<number | null>((a, r) => (r.dmin != null && (a == null || r.dmin < a)) ? r.dmin : a, null);
+  const allMax = rm.reduce<number | null>((a, r) => (r.dmax != null && (a == null || r.dmax > a)) ? r.dmax : a, null);
 
   kids.push(...docSection(D, '1. Үндсэн үзүүлэлт',
     `Нийт ${fmtNum(d.totalCount)} өргөдөл бүртгэгдэж, ` +
@@ -297,7 +310,7 @@ function buildDocument(D, d){
     'Доорх хүснэгтэд аймаг тус бүрд олгосон зээлийн тоог буурах эрэмбээр харуулав.',
     docTable(D, ['Аймаг', 'Тоо'], d.aimagCnt.map(([k, v]) => [k, fmtNum(v)]), [60, 40], [1])));
 
-  const soumNote = rows => rows.length >= SOUM_LIMIT
+  const soumNote = (rows: unknown[]) => rows.length >= SOUM_LIMIT
     ? ` Хамгийн өндөр ${SOUM_LIMIT} сумыг оруулав.` : '';
 
   kids.push(...docSection(D, '4. Олгосон зээлийн дүн, сумаар',
@@ -357,12 +370,8 @@ function buildDocument(D, d){
 
 /* ---------- Товч ---------- */
 
-async function downloadReport(){
-  const btn = document.getElementById('report-btn');
-  const label = btn.querySelector('span');
-  const was = label.textContent;
-  btn.disabled = true;
-  label.textContent = 'Бэлтгэж байна…';
+/** Тайланг угсарч татна. Алдаа гарвал alert харуулна (товчны төлөвийг компонент удирдана). */
+export async function downloadReport(): Promise<void> {
   try {
     const [D, data] = await Promise.all([loadDocx(), collectReportData()]);
     const blob = await D.Packer.toBlob(buildDocument(D, data));
@@ -374,11 +383,8 @@ async function downloadReport(){
     a.click();
     a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    alert('Тайлан үүсгэхэд алдаа гарлаа: ' + err.message);
-  } finally {
-    btn.disabled = false;
-    label.textContent = was;
+    alert('Тайлан үүсгэхэд алдаа гарлаа: ' + (err && err.message ? err.message : err));
   }
 }

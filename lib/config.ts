@@ -1,5 +1,5 @@
 /* Dashboard bfb940a423854fb992e1df8a26e01cf0 -н дата эх сурвалжууд */
-const SVC = {
+export const SVC = {
   // Үндсэн зээлийн цэгэн давхарга (Khorshoo / FeatureServer / 0)
   loans: 'https://services-ap1.arcgis.com/ACqsMOmNLi5wIdIh/arcgis/rest/services/Khorshoo/FeatureServer/0',
   // Зээлийн тайлан (төсөв / гүйцэтгэл)
@@ -13,9 +13,9 @@ const SVC = {
 };
 
 /* Газрын зураг — эх дашбоардын вэб зураг (Khorshoo сервис үүний давхарга) */
-const WEBMAP_ID = 'c9f54d5718934201bd690f921e69abe1';
+export const WEBMAP_ID = 'c9f54d5718934201bd690f921e69abe1';
 
-const F = {
+export const F = {
   aimag: 'Аймаг',
   soum: 'Зөв_сумын_нэр',
   purpose: 'Зээлийн_зориулалт',
@@ -33,14 +33,28 @@ const F = {
   // Хоршоог тоолоход РД-г ашиглана: нэг хоршоо олон бичлэгт өөр өөрөөр
   // бичигдсэн байдаг тул нэрээр тоолоход 9,081 гарч 1,297-оор илүүддэг
   coopId: 'Хоршооны_РД'
-};
+} as const;
+
+/** Шүүлтүүрт оролцдог 4 ангиллын талбар */
+export type FilterField = typeof F.aimag | typeof F.soum | typeof F.purpose | typeof F.bank;
+export const FILTER_FIELDS: FilterField[] = [F.aimag, F.soum, F.purpose, F.bank];
+
+export interface KpiDef {
+  id?: string;
+  label: string;
+  icon: string;
+  stat: 'count' | 'sum';
+  field: string;
+  extraWhere?: string;
+  kind: 'count' | 'money';
+}
 
 /* Толгойн 7 үзүүлэлт */
 /* Нэр, дүрс нь дашбоардын indicator widget-ийн topSection / iconInfo-оос */
 /* Эхэнд хоёр тоо (хэдэн зээл / хэдэн зээлдэгч), дараа нь дүнгүүд зээлийн
    амьдралын мөчлөгөөр: хүссэн -> батлан даасан -> батлагдсан -> олгосон ->
    үлдэгдэл. Ингэснээр зүүнээс баруун тийш "хүсэлт -> одоогийн өр" болж уншина. */
-const KPIS = [
+export const KPIS: KpiDef[] = [
   { id:'loanCount', label:'ЗЭЭЛИЙН ТОО', icon:'5bb8df86', stat:'count', field:'OBJECTID',
     extraWhere:`${F.issuedAmt} <> 0`, kind:'count' },
   // Тайлангийн "Үлдэгдэл — тоо" багана: үлдэгдэлтэй үлдсэн зээлдэгчид
@@ -57,14 +71,21 @@ const KPIS = [
    Эх дашбоард дээр эдгээр нь indicator widget-ийн middleSection дэх тогтмол
    бичвэр (statisticDefinitions-той ч үр дүнг нь ашигладаггүй) тул энд ч
    тогтмолоор бичив. Шинэ тайлан гармагц зөвхөн эдгээр тоог солино. */
-const YEAR_KPIS = [
+export const YEAR_KPIS = [
   { year:'2024', budget:  25.2e9, actual: 25.1e9 },
   { year:'2025', budget: 105.3e9, actual: 59.4e9 },
   { year:'2026', budget:  75.9e9, actual: 62.8e9 }
 ];
 
+export interface SelectorDef {
+  field: FilterField;
+  label: string;
+  dependsOn?: FilterField;
+  labelOverrides?: Record<string, string>;
+}
+
 /* Толгойн шүүлтүүрүүд */
-const SELECTORS = [
+export const SELECTORS: SelectorDef[] = [
   { field:F.aimag,   label:'АЙМАГ' },
   { field:F.soum,    label:'СУМ',       dependsOn:F.aimag },
   { field:F.purpose, label:'ЗОРИУЛАЛТ', labelOverrides:{ '-':'Татгалзсан' } },
@@ -73,7 +94,7 @@ const SELECTORS = [
 
 /* Зээлийн зориулалтын албан ёсны ҮАЧ код — графикийн тэнхлэгт богиноор,
    hover дээр бүтэн нэрээр харагдана */
-const PURPOSE_CODE = {
+export const PURPOSE_CODE: Record<string, string> = {
   'Бэлчээрт худаг, уст цэг гаргах, усан хангамж байгуулах': 'ҮАЧ-1',
   'Бүх төрлийн тэжээлийн ургамал тариалах, тэжээлийн үйлдвэрлэл, цех байгуулах, өргөтгөх, тоног төхөөрөмжийн шинэчлэл хийх': 'ҮАЧ-2',
   'Мал бордох аж ахуй байгуулах, өргөтгөх, тоног төхөөрөмжийн шинэчлэл хийх': 'ҮАЧ-3',
@@ -91,27 +112,27 @@ const PURPOSE_CODE = {
 };
 
 /** Зайг жигдрүүлэн кодыг хайна; олдохгүй бол нэрийг нь өөрийг нь буцаана */
-const purposeCode = name => {
+export const purposeCode = (name: unknown): string => {
   if (name == null) return '';
   const key = String(name).replace(/\s+/g, ' ').trim();
   return PURPOSE_CODE[key] || key;
 };
 
 /* ArcGIS Dashboards-ийн numberPrefixOverrides — тоог монгол нэгжээр товчлоно */
-const NUM_PREFIX = [[1e12,'их наяд'], [1e9,'тэрбум'], [1e6,'сая'], [1e3,'k']];
+export const NUM_PREFIX: [number, string][] = [[1e12,'их наяд'], [1e9,'тэрбум'], [1e6,'сая'], [1e3,'k']];
 
-const PALETTE = ['#22d3ee','#0891b2','#67e8f9','#0e7490','#a5f3fc','#06b6d4',
-                 '#38bdf8','#155e75','#7dd3fc','#5eead4','#0284c7','#cffafe'];
+export const PALETTE = ['#22d3ee','#0891b2','#67e8f9','#0e7490','#a5f3fc','#06b6d4',
+                        '#38bdf8','#155e75','#7dd3fc','#5eead4','#0284c7','#cffafe'];
 
 /* Сумын графикт харуулах хамгийн их мөр (улсдаа 352 аймаг-сум хос байдаг) */
-const SOUM_LIMIT = 30;
+export const SOUM_LIMIT = 30;
 
 /* Бүх баганан (serial) график нэг ижил өнгөтэй */
-const BAR_COLOR  = PALETTE[0];
+export const BAR_COLOR  = PALETTE[0];
 /* Бүх area график (төлөлтийн цуваанууд) нэг ижил өнгөтэй */
-const AREA_COLOR = PALETTE[7];
+export const AREA_COLOR = PALETTE[7];
 
-const RICH_TEXT = `
+export const RICH_TEXT = `
 <ul>
   <li><strong>Зээлийн хүү:</strong> Зээлийн хүү 12 хувь</li>
   <li><strong>Урамшуулал олгох үндэслэл:</strong> Засгийн газрын 2024 оны 166 дугаар тогтоол</li>
@@ -128,7 +149,7 @@ const RICH_TEXT = `
 </ul>`;
 
 /* Дашбоардын "Зөвлөмж" — одоогоор дэлгэцэнд гаргаагүй, хэрэгтэй үед ашиглана */
-const SIDEBAR_HTML = `
+export const SIDEBAR_HTML = `
 <p style="text-align:center"><strong>Зөвлөмж</strong></p>
 <p><strong>1. Илүү олон банк оролцуулах.</strong> Одоо нийт зээлийн 99.7%-ийг Төрийн банк, Хаан банк хоёр л олгож байна. Хадгаламж зээлийн хоршоо, бичил санхүүгийн байгууллагуудыг нэмж оруулбал хөдөө орон нутгийн хүртээмж нэмэгдэнэ.</p>
 <p><strong>2. 2029 оны төлбөрийг тэгшлэх.</strong> Тэр нэг жилд 698 тэрбум төгрөг төвлөрсөн нь системийн эрсдэл. Зуд буух, эсвэл түүхий эдийн үнэ унавал олон зээлдэгч зэрэг алдагдана. Хугацаа сунгах, улирлын орлоготой уялдсан уян хатан хуваарь өгөх хэрэгтэй.</p>
