@@ -6,6 +6,7 @@ import { resetFilters } from '@/lib/data';
 import Selector from './Selector';
 import DateSelector from './DateSelector';
 import ReportButton from './ReportButton';
+import UserBadge from './UserBadge';
 
 /** Нээлттэй цэсний түлхүүр: сонгогчийн талбар | 'date' | null */
 export type MenuKey = string | null;
@@ -37,6 +38,7 @@ export default function Header() {
         <DateSelector open={open === 'date'} onToggle={() => toggle('date')} onClose={close} />
         <ReportButton />
         <button id="resetBtn" className="icon-btn" title="Шүүлтүүр цэвэрлэх" onClick={resetFilters}>&#10227;</button>
+        <UserBadge />
       </div>
     </header>
   );

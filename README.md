@@ -35,13 +35,37 @@ Node.js 20+ шаардлагатай. Production-д зөвхөн `out/` хавт
 workflow нь `NEXT_PUBLIC_BASE_PATH=/<repo>` гэж тохируулж build хийдэг.
 Өөр домэйн дээр root-оос үйлчлэх бол энэ хувьсагчийг тавихгүй.
 
+## ArcGIS Online нэвтрэлт (заавал биш)
+
+`NEXT_PUBLIC_ARCGIS_CLIENT_ID` орчны хувьсагч тавигдсан үед л идэвхжинэ. Хоосон бол
+апп нэвтрэлтгүй, нээлттэй ажиллана.
+
+1. ArcGIS Online → Content → New item → **Developer credentials** → **OAuth 2.0 credentials**.
+2. Redirect URLs: аппын хаяг (`https://khorshoo-loan.vercel.app/`, `https://khorshoo-loan.vercel.app`)
+   ба хөгжүүлэлтэд `http://localhost:3000`. Application environment: Browser. URL: аппын хаяг.
+3. Үүссэн **Client ID**-г Vercel → Settings → Environment Variables дээр
+   `NEXT_PUBLIC_ARCGIS_CLIENT_ID` нэрээр нэмж, дахин deploy хийнэ. Локалд `.env.local` файлд бичнэ
+   (`.env.example`-ийг хар). Client Secret хэрэггүй.
+
+Нэвтэрсний дараа `@arcgis/core`-ийн бүх хүсэлт (вэб зураг, давхарга) болон аппын REST
+асуулгууд (`lib/data.ts`) token-той явна. Тиймээс сервисүүдийг AGOL дээр private болгож,
+нэвтэрсэн хэрэглэгчдэд хуваалцсан ч апп ажиллана. Сервис public хэвээр бол нэвтрэлт нь
+зөвхөн хуудсыг хаах бөгөөд REST хаягаар шууд хандахаас хамгаалахгүй.
+
+Холбогдох файлууд: `lib/auth.ts` (IdentityManager + OAuthInfo), `components/AuthGate.tsx`
+(нэвтрэх дэлгэц), `components/UserBadge.tsx` (нэр + Гарах товч).
+
 ## Бүтэц
 
 ```
 app/layout.tsx          <html lang="mn">, ArcGIS dark сэдвийн CSS, globals.css
-app/page.tsx            Dashboard-ыг зөвхөн клиент дээр (ssr:false) ачаална
+app/page.tsx            App-ыг зөвхөн клиент дээр (ssr:false) ачаална
+.env.example            ArcGIS нэвтрэлтийн орчны хувьсагчийн жишээ
 app/globals.css         dark сэдэв, grid layout
 components/
+  App.tsx               AuthGate + Dashboard
+  AuthGate.tsx          ArcGIS Online нэвтрэлтийн хаалт (Client ID байхгүй бол алгасна)
+  UserBadge.tsx         нэвтэрсэн хэрэглэгчийн нэр, Гарах товч
   Dashboard.tsx         3 багана, KPI мөрүүд; init (газрын зураг, статик виджет) ба refresh
   Header.tsx            гарчиг, сонгогчид, огноо, Тайлан, цэвэрлэх; цэсний нээлт/хаалт
   Selector.tsx          олон сонголттой, хайлттай, каскад сонгогч
@@ -53,6 +77,7 @@ components/
   MapPanel.tsx          газрын зураг 2D/3D, тохирох хоршооны тоо
   Loading.tsx           хүсэлт явж байх үеийн spinner
 lib/
+  auth.ts               OAuth 2.0 нэвтрэлт (IdentityManager, OAuthInfo), token
   config.ts             сервисийн URL, талбарын нэр, KPI/сонгогчийн тодорхойлолт, текст
   icons.ts              KPI-ийн SVG дүрсүүд (эх дашбоардын iconInfo)
   store.ts              жижиг гадаад store (useSyncExternalStore): busy, KPI, map count/title

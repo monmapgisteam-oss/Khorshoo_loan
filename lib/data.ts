@@ -2,6 +2,7 @@
 
 import { F, FILTER_FIELDS, NUM_PREFIX, type FilterField } from './config';
 import { busyStore, createStore } from './store';
+import { currentToken } from './auth';
 
 function busy(on: boolean) {
   busyStore.set(n => n + (on ? 1 : -1));
@@ -16,7 +17,9 @@ export interface StatDef {
 }
 
 export async function esriQuery(url: string, params: Record<string, string>): Promise<any> {
-  const body = new URLSearchParams({ f:'json', sqlFormat:'standard', ...params });
+  // Нэвтэрсэн бол token нэмнэ — хувийн (private) сервис ч уншигдана
+  const token = currentToken();
+  const body = new URLSearchParams({ f:'json', sqlFormat:'standard', ...(token ? { token } : {}), ...params });
   busy(true);
   try{
     const r = await fetch(url + '/query', {
